@@ -12,6 +12,7 @@ import {
   createErrorResponse,
 } from '../ApiRespose/interface/response.interface';
 import { AuthData } from './interfaces/auth.interface';
+import { BearerToken } from './decorators/auth.decorator';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -66,7 +67,7 @@ export class AuthController {
     description: 'Token refresh successful',
   })
   async refreshToken(
-    @Body('refresh_token') refreshToken: string,
+    @BearerToken() refreshToken: string,
   ): Promise<ApiResponse<AuthData>> {
     try {
       const result = await this.authService.refreshToken(refreshToken);
@@ -96,11 +97,14 @@ export class AuthController {
     description: 'Token verification result',
   })
   async verifyToken(
-    @Body('access_token') accessToken: string,
-  ): Promise<ApiResponse<{ isValid: boolean }>> {
+    @BearerToken() accessToken: string,
+  ): Promise<
+    ApiResponse<{ isValid: boolean; isExpired: boolean; message?: string }>
+  > {
     try {
-      const isValid = await this.authService.verifyAccessToken(accessToken);
-      return createSuccessResponse({ isValid });
+      console.log('accessToken', accessToken);
+      const result = await this.authService.verifyAccessToken(accessToken);
+      return createSuccessResponse(result);
     } catch (error) {
       return createErrorResponse(
         error.status || HttpStatus.UNAUTHORIZED,
@@ -116,7 +120,7 @@ export class AuthController {
     description: 'Re-login successful',
   })
   async reLogin(
-    @Body('access_token') accessToken: string,
+    @BearerToken() accessToken: string,
   ): Promise<ApiResponse<AuthData>> {
     try {
       const result = await this.authService.reLoginWithToken(accessToken);
@@ -124,7 +128,7 @@ export class AuthController {
     } catch (error) {
       return createErrorResponse(
         error.status || HttpStatus.UNAUTHORIZED,
-        error.message || 'Re-login failed',
+        error.message || 'Re-login failed with token',
       );
     }
   }

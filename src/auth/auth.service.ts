@@ -133,21 +133,36 @@ export class AuthService {
     }
   }
 
-  async verifyAccessToken(accessToken: string): Promise<boolean> {
+  async verifyAccessToken(accessToken: string): Promise<{
+    isValid: boolean;
+    isExpired: boolean;
+    message?: string;
+  }> {
     try {
       const payload = this.jwtService.verify(accessToken);
       if (payload.type !== 'access_token') {
-        return false;
+        return {
+          isValid: false,
+          isExpired: false,
+          message: 'Invalid token type',
+        };
       }
 
       const user = await this.userModel.findById(payload.sub).exec();
       if (!user) {
-        return false;
+        return { isValid: false, isExpired: false, message: 'User not found' };
       }
 
-      return true;
+      return { isValid: true, isExpired: false };
     } catch (error) {
-      return false;
+      if (error.name === 'TokenExpiredError') {
+        return {
+          isValid: false,
+          isExpired: true,
+          message: 'Token has expired',
+        };
+      }
+      return { isValid: false, isExpired: false, message: 'Invalid token' };
     }
   }
 
