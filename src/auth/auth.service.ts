@@ -12,14 +12,14 @@ import { User, UserDocument, UserStatus } from './schemas/user.schema';
 import { ChangePasswordDto, RegisterDto } from './dto/auth.dto';
 
 import { AuthData } from './interfaces/auth.interface';
-import { MailerService } from '@nestjs-modules/mailer';
+import { MailService } from 'src/mail/mail.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private jwtService: JwtService,
-    private mailerService: MailerService,
+    private mailService: MailService,
   ) {}
 
   async register(registerDto: RegisterDto): Promise<AuthData> {
@@ -247,35 +247,10 @@ export class AuthService {
     user.resetPasswordOTPExpires = otpExpiry;
     await user.save();
 
-    // Send email with OTP
-    await this.mailerService.sendMail({
-      to: email,
-      subject: 'Password Reset Request',
-      html: `
-        <h3>Password Reset Request</h3>
-        <p>Your OTP for password reset is: <strong>${otp}</strong></p>
-        <p>This OTP will expire in 15 minutes.</p>
-        <p>If you did not request this password reset, please ignore this email.</p>
-      `,
-    });
+    // Replace mailerService with mailService
+    await this.mailService.sendPasswordResetEmail(email, otp);
 
     return { message: 'Reset OTP has been sent to your email' };
-  }
-
-  async verifyOtp(email: string, otp: string): Promise<{ message: string }> {
-    const user = await this.userModel
-      .findOne({
-        email,
-        resetPasswordOTP: otp,
-        resetPasswordOTPExpires: { $gt: new Date() },
-      })
-      .exec();
-
-    if (!user) {
-      throw new UnauthorizedException('Invalid or expired OTP');
-    }
-
-    return { message: 'OTP verified successfully' };
   }
 
   async resetPassword(
@@ -330,12 +305,8 @@ export class AuthService {
     user.resetPasswordOTPExpires = otpExpiry;
     await user.save();
 
-    // Send email with OTP
-    await this.mailerService.sendMail({
-      to: email,
-      subject: 'Password Reset OTP',
-      text: `Your OTP for password reset is: ${otp}\nThis OTP will expire in 15 minutes.`,
-    });
+    // Replace mailerService with mailService
+    await this.mailService.sendPasswordResetEmail(email, otp);
   }
 
   async resetPasswordWithOTP(

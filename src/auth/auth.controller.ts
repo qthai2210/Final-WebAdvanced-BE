@@ -28,11 +28,15 @@ import {
 } from '../ApiRespose/interface/response.interface';
 import { AuthData } from './interfaces/auth.interface';
 import { BearerToken } from './decorators/auth.decorator';
+import { MailService } from '../mail/mail.service';
 
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly mailService: MailService,
+  ) {}
 
   @Post('login')
   @ApiOperation({ summary: 'User login' })
@@ -176,7 +180,7 @@ export class AuthController {
   @Post('verify-otp')
   @ApiOperation({ summary: 'Verify OTP code' })
   async verifyOtp(@Body() verifyOtpDto: VerifyOtpDto) {
-    return this.authService.verifyOtp(verifyOtpDto.email, verifyOtpDto.otp);
+    return this.mailService.verifyOtp(verifyOtpDto.email, verifyOtpDto.otp);
   }
 
   @Post('forgot-password')

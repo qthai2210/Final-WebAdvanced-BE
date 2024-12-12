@@ -8,6 +8,8 @@ import { validationSchema } from './config/validation.schema';
 import { AuthModule } from './auth/auth.module';
 import { DebtModule } from './debt/debt.module';
 import { NotificationModule } from './notification/notification.module';
+import { MailModule } from './mail/mail.module';
+import { UtilsModule } from './utils/utils.module';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { NotificationModule } from './notification/notification.module';
     AuthModule,
     DebtModule,
     NotificationModule,
+    MailModule,
+    UtilsModule,
     // AccountsModule,
     // TransactionsModule,
     // DebtsModule,

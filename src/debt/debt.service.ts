@@ -17,8 +17,10 @@ import {
 } from './dto/debt.dto';
 import { CancelDebtDto } from './dto/cancel-debt.dto';
 import { NotificationService } from '../notification/notification.service';
-import { AuthService } from '../auth/auth.service';
 import { User } from '../auth/schemas/user.schema'; // Thêm import này
+import { JwtUtil } from 'src/utils/jwt.util';
+import { MailService } from '../mail/mail.service'; // Thêm import này
+import { AuthService } from 'src/auth/auth.service';
 
 @Injectable()
 export class DebtService {
@@ -27,13 +29,15 @@ export class DebtService {
     @InjectModel(User.name) private userModel: Model<User>, // Thêm inject UserModel
     private jwtService: JwtService,
     private notificationService: NotificationService,
-    private authService: AuthService,
+    private mailService: MailService,
+    private JWTUtil: JwtUtil,
+    private authService: AuthService, // Thêm authService
   ) {}
 
-  private decodeToken(accessToken: string): string {
+  private decodeToken(accessToken: string) {
     try {
-      const decoded = this.jwtService.decode(accessToken);
-      //console.log(decoded);
+      const decoded = this.JWTUtil.decodeJwt(accessToken);
+      console.log(decoded);
       if (!decoded.sub) {
         throw new UnauthorizedException('Invalid token');
       }
@@ -216,8 +220,8 @@ export class DebtService {
       throw new BadRequestException('You are not the debtor');
     }
 
-    // Verify OTP với email từ user object
-    const isValidOtp = await this.authService.verifyOtp(
+    // Verify OTP với mailService thay vì authService
+    const isValidOtp = await this.mailService.verifyOtp(
       user.email,
       payDebtDto.otp,
     );
