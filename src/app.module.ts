@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 
 import { validationSchema } from './config/validation.schema';
 import { AuthModule } from './auth/auth.module';
+import { DebtModule } from './debt/debt.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { AuthModule } from './auth/auth.module';
       inject: [ConfigService],
     }),
     AuthModule,
+    DebtModule,
     // AccountsModule,
     // TransactionsModule,
     // DebtsModule,
