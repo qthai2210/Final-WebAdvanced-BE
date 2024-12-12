@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+
 import { NotificationService } from './notification.service';
 import {
   Notification,
@@ -15,6 +17,21 @@ import { UserSchema } from 'src/auth/schemas/user.schema';
       { name: 'User', schema: UserSchema },
     ]),
     AuthModule, // Import AuthModule instead of directly importing User schema
+    ClientsModule.register([
+      {
+        name: 'NOTIFICATION_SERVICE',
+        transport: Transport.RMQ,
+        options: {
+          urls: [process.env.RABBITMQ_URL],
+          queue: process.env.RABBITMQ_QUEUE,
+          queueOptions: {
+            durable: true,
+          },
+          noAssert: false,
+          persistent: true,
+        },
+      },
+    ]),
   ],
   providers: [NotificationService],
   exports: [NotificationService],
