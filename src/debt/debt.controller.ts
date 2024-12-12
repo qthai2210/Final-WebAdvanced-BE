@@ -1,11 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Post,
-  //Request,
-  //UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Post, Param, Patch } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -16,12 +9,11 @@ import { DebtService } from './debt.service';
 import { CreateDebtDto } from './dto/create-debt.dto';
 import { BearerToken } from 'src/auth/decorators/auth.decorator';
 import { DebtSummaryDto } from './dto/debt.dto';
-//import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CancelDebtDto } from './dto/cancel-debt.dto';
 
 @ApiTags('Debts')
 @Controller('debts')
 @ApiBearerAuth()
-//@UseGuards(JwtAuthGuard)
 export class DebtController {
   constructor(private readonly debtService: DebtService) {}
 
@@ -77,5 +69,27 @@ export class DebtController {
   })
   async getDebtsSummary(@BearerToken() accessToken: string) {
     return this.debtService.getDebtsSummary(accessToken);
+  }
+
+  @Patch(':id/cancel')
+  @ApiOperation({ summary: 'Huỷ một khoản nợ' })
+  @ApiResponse({
+    status: 200,
+    description: 'Khoản nợ đã được huỷ thành công',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Không có quyền huỷ khoản nợ này',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Not Found - Không tìm thấy khoản nợ',
+  })
+  async cancelDebt(
+    @BearerToken() accessToken: string,
+    @Param('id') debtId: string,
+    @Body() cancelDebtDto: CancelDebtDto,
+  ) {
+    return this.debtService.cancelDebt(accessToken, debtId, cancelDebtDto);
   }
 }

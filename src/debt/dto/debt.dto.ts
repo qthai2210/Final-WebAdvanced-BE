@@ -2,9 +2,16 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class DebtDetailDto {
   @ApiProperty({
+    description: 'ID của khoản nợ',
+    example: '507f1f77bcf86cd799439011',
+  })
+  _id: string;
+
+  @ApiProperty({
     description: 'Thông tin người tạo nợ',
   })
   fromUser: {
+    _id: string; // This will be ObjectId converted to string
     fullName: string;
     username: string;
   };
@@ -13,6 +20,7 @@ export class DebtDetailDto {
     description: 'Thông tin người nhận nợ',
   })
   toUser: {
+    _id: string;
     fullName: string;
     username: string;
   };

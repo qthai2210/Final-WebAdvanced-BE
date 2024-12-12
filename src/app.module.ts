@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 import { validationSchema } from './config/validation.schema';
 import { AuthModule } from './auth/auth.module';
 import { DebtModule } from './debt/debt.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { DebtModule } from './debt/debt.module';
     }),
     AuthModule,
     DebtModule,
+    NotificationModule,
     // AccountsModule,
     // TransactionsModule,
     // DebtsModule,

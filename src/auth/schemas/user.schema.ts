@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export enum UserRole {
   CUSTOMER = 'customer',
@@ -14,6 +14,7 @@ export enum UserStatus {
 }
 
 export interface UserDocument extends Document {
+  _id: Types.ObjectId;
   username: string;
   password: string;
   email: string;
@@ -35,6 +36,9 @@ export interface UserDocument extends Document {
 
 @Schema({ timestamps: true })
 export class User {
+  @Prop({ type: Types.ObjectId, auto: true })
+  _id: Types.ObjectId;
+
   @Prop({ required: true, unique: true })
   username: string;
 
