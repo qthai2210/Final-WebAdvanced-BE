@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export enum UserRole {
   CUSTOMER = 'customer',
@@ -14,6 +14,7 @@ export enum UserStatus {
 }
 
 export interface UserDocument extends Document {
+  _id: Types.ObjectId;
   username: string;
   password: string;
   email: string;
@@ -28,6 +29,8 @@ export interface UserDocument extends Document {
   refreshToken?: string;
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
+  resetPasswordOTP?: string;
+  resetPasswordOTPExpires?: Date;
   failedLoginAttempts: number;
   lockUntil?: Date;
   isLocked(): boolean;
@@ -35,6 +38,9 @@ export interface UserDocument extends Document {
 
 @Schema({ timestamps: true })
 export class User {
+  @Prop({ type: Types.ObjectId, auto: true })
+  _id: Types.ObjectId;
+
   @Prop({ required: true, unique: true })
   username: string;
 
@@ -90,6 +96,12 @@ export class User {
 
   @Prop()
   lockUntil: Date;
+
+  @Prop()
+  resetPasswordOTP?: string;
+
+  @Prop()
+  resetPasswordOTPExpires?: Date;
 
   isLocked(): boolean {
     return !!(this.lockUntil && this.lockUntil > new Date());
