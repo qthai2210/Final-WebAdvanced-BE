@@ -10,6 +10,7 @@ import { CreateDebtDto } from './dto/create-debt.dto';
 import { BearerToken } from 'src/auth/decorators/auth.decorator';
 import { DebtSummaryDto } from './dto/debt.dto';
 import { CancelDebtDto } from './dto/cancel-debt.dto';
+import { PayDebtDto, SendPaymentOtpDto } from './dto/debt.dto';
 
 @ApiTags('Debts')
 @Controller('debts')
@@ -91,5 +92,23 @@ export class DebtController {
     @Body() cancelDebtDto: CancelDebtDto,
   ) {
     return this.debtService.cancelDebt(accessToken, debtId, cancelDebtDto);
+  }
+
+  @Post('pay')
+  @ApiOperation({ summary: 'Pay a debt with OTP verification' })
+  async payDebt(
+    @BearerToken() accessToken: string,
+    @Body() payDebtDto: PayDebtDto,
+  ) {
+    return this.debtService.payDebt(accessToken, payDebtDto);
+  }
+
+  @Post('send-payment-otp')
+  @ApiOperation({ summary: 'Send OTP for debt payment verification' })
+  async sendPaymentOtp(
+    @BearerToken() accessToken: string,
+    @Body() sendOtpDto: SendPaymentOtpDto,
+  ) {
+    return this.debtService.sendPaymentOtp(accessToken, sendOtpDto);
   }
 }

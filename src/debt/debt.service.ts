@@ -2,22 +2,32 @@ import {
   Injectable,
   UnauthorizedException,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { JwtService } from '@nestjs/jwt';
 import { Debt, DebtDocument } from '../models/debts/schemas/debt.schema';
 import { CreateDebtDto } from './dto/create-debt.dto';
-import { DebtSummaryDto, DebtDetailDto } from './dto/debt.dto';
+import {
+  DebtSummaryDto,
+  DebtDetailDto,
+  PayDebtDto,
+  SendPaymentOtpDto,
+} from './dto/debt.dto';
 import { CancelDebtDto } from './dto/cancel-debt.dto';
 import { NotificationService } from '../notification/notification.service';
+import { AuthService } from '../auth/auth.service';
+import { User } from '../auth/schemas/user.schema'; // Thêm import này
 
 @Injectable()
 export class DebtService {
   constructor(
     @InjectModel(Debt.name) private debtModel: Model<DebtDocument>,
+    @InjectModel(User.name) private userModel: Model<User>, // Thêm inject UserModel
     private jwtService: JwtService,
     private notificationService: NotificationService,
+    private authService: AuthService,
   ) {}
 
   private decodeToken(accessToken: string): string {
@@ -27,7 +37,7 @@ export class DebtService {
       if (!decoded.sub) {
         throw new UnauthorizedException('Invalid token');
       }
-      return decoded.sub;
+      return decoded;
     } catch (error) {
       console.log(error);
       throw new UnauthorizedException('Invalid or expired token');
@@ -38,10 +48,10 @@ export class DebtService {
     accessToken: string,
     createDebtDto: CreateDebtDto,
   ): Promise<Debt> {
-    const fromUserId = this.decodeToken(accessToken);
+    const user = this.decodeToken(accessToken);
 
     const newDebt = new this.debtModel({
-      fromUserId,
+      fromUserId: user.sub,
       toUserId: createDebtDto.toUserId,
       amount: createDebtDto.amount,
       content: createDebtDto.content,
@@ -52,34 +62,34 @@ export class DebtService {
   }
 
   async getDebtsByDebtor(accessToken: string): Promise<Debt[]> {
-    const userId = this.decodeToken(accessToken);
+    const user = this.decodeToken(accessToken);
     return this.debtModel
-      .find({ toUserId: userId })
+      .find({ toUserId: user.sub })
       .populate(['fromUserId', 'toUserId', 'transactionId'])
       .exec();
   }
 
   async getDebtsByCreditor(accessToken: string): Promise<Debt[]> {
-    const userId = this.decodeToken(accessToken);
+    const user = this.decodeToken(accessToken);
 
     return this.debtModel
-      .find({ fromUserId: userId })
+      .find({ fromUserId: user.sub })
       .populate(['fromUserId', 'toUserId', 'transactionId'])
       .exec();
   }
 
   async getDebtsSummary(accessToken: string): Promise<DebtSummaryDto> {
-    const userId = this.decodeToken(accessToken);
+    const user = this.decodeToken(accessToken);
 
     // Lấy tất cả các khoản nợ liên quan đến user
     const [createdDebts, receivedDebts] = await Promise.all([
       this.debtModel
-        .find({ fromUserId: userId })
+        .find({ fromUserId: user.sub })
         .populate(['fromUserId', 'toUserId'])
         .sort({ createdAt: -1 })
         .exec(),
       this.debtModel
-        .find({ toUserId: userId })
+        .find({ toUserId: user.sub })
         .populate(['fromUserId', 'toUserId'])
         .sort({ createdAt: -1 })
         .exec(),
@@ -126,7 +136,7 @@ export class DebtService {
     debtId: string,
     cancelDebtDto: CancelDebtDto,
   ): Promise<Debt> {
-    const userId = this.decodeToken(accessToken);
+    const user = this.decodeToken(accessToken);
     const session = await this.debtModel.startSession();
 
     try {
@@ -138,7 +148,7 @@ export class DebtService {
           {
             _id: debtId,
             status: 'pending', // Chỉ tìm những khoản nợ pending
-            $or: [{ fromUserId: userId }, { toUserId: userId }],
+            $or: [{ fromUserId: user.sub }, { toUserId: user.sub }],
           },
           { status: 'cancelled' },
           {
@@ -157,7 +167,8 @@ export class DebtService {
       }
 
       // Gửi thông báo
-      const isCancelledByCreator = debt.fromUserId._id.toString() === userId;
+      const isCancelledByCreator =
+        debt.fromUserId._id.toString() === user.sub.toString();
       const notifyUserId = isCancelledByCreator
         ? debt.toUserId._id.toString()
         : debt.fromUserId._id.toString();
@@ -181,5 +192,85 @@ export class DebtService {
     } finally {
       session.endSession();
     }
+  }
+
+  async payDebt(accessToken: string, payDebtDto: PayDebtDto) {
+    const decoded = this.decodeToken(accessToken);
+
+    // Lấy thông tin user đầy đủ từ database
+    const user = await this.userModel.findById(decoded.sub);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const debt = await this.debtModel.findById(payDebtDto.debtId);
+    if (!debt) {
+      throw new NotFoundException('Debt not found');
+    }
+
+    if (debt.status === 'paid') {
+      throw new BadRequestException('Debt already paid');
+    }
+
+    if (debt.toUserId.toString() !== user._id.toString()) {
+      throw new BadRequestException('You are not the debtor');
+    }
+
+    // Verify OTP với email từ user object
+    const isValidOtp = await this.authService.verifyOtp(
+      user.email,
+      payDebtDto.otp,
+    );
+
+    if (!isValidOtp) {
+      throw new BadRequestException('Invalid OTP');
+    }
+
+    // Process payment
+    const updatedDebt = await this.debtModel.findByIdAndUpdate(
+      payDebtDto.debtId,
+      { status: 'paid', paidAt: new Date() },
+      { new: true },
+    );
+
+    // Send notification to debt creator
+    await this.notificationService.createNotification({
+      userId: debt.fromUserId.toString(),
+      content: `Your debt of ${debt.amount} has been paid`,
+      type: 'DEBT_PAYMENT',
+      relatedId: debt._id.toString(),
+    });
+
+    return updatedDebt;
+  }
+
+  async sendPaymentOtp(accessToken: string, sendOtpDto: SendPaymentOtpDto) {
+    const decoded = this.decodeToken(accessToken);
+
+    // Lấy thông tin user đầy đủ từ database
+    const user = await this.userModel.findById(decoded.sub);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const debt = await this.debtModel.findById(sendOtpDto.debtId);
+    if (!debt) {
+      throw new NotFoundException('Debt not found');
+    }
+
+    if (debt.status !== 'pending') {
+      throw new BadRequestException('Debt is not in pending status');
+    }
+
+    if (debt.toUserId.toString() !== user._id.toString()) {
+      throw new BadRequestException('You are not the debtor');
+    }
+
+    // Gửi OTP với email từ user object
+    await this.authService.initiateForgotPassword(user.email);
+
+    return {
+      message: 'OTP has been sent to your email',
+    };
   }
 }

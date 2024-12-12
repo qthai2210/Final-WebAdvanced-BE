@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, Length } from 'class-validator';
 
 export class DebtDetailDto {
   @ApiProperty({
@@ -62,4 +63,23 @@ export class DebtSummaryDto {
     type: [DebtDetailDto],
   })
   receivedDebts: DebtDetailDto[];
+}
+
+export class PayDebtDto {
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  @IsString()
+  @IsNotEmpty()
+  debtId: string;
+
+  @ApiProperty({ example: '123456' })
+  @IsString()
+  @Length(6, 6)
+  otp: string;
+}
+
+export class SendPaymentOtpDto {
+  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  @IsString()
+  @IsNotEmpty()
+  debtId: string;
 }

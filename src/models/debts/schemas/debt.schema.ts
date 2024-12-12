@@ -7,7 +7,7 @@ import { User } from 'src/auth/schemas/user.schema';
 export type DebtDocument = Debt & Document;
 
 @Schema({ timestamps: true })
-export class Debt {
+export class Debt extends Document {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   fromUserId: User;
 
@@ -23,8 +23,15 @@ export class Debt {
   @Prop({ default: Date.now })
   createdAt: Date;
 
-  @Prop({ default: 'pending', enum: ['pending', 'paid', 'cancelled'] })
+  @Prop({
+    type: String,
+    enum: ['pending', 'paid', 'cancelled'],
+    default: 'pending',
+  })
   status: string;
+
+  @Prop({ type: Date })
+  paidAt?: Date;
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Transaction' })
   transactionId: Transaction;
