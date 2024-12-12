@@ -1,4 +1,81 @@
-import { Controller } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  //Request,
+  //UseGuards,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
+import { DebtService } from './debt.service';
+import { CreateDebtDto } from './dto/create-debt.dto';
+import { BearerToken } from 'src/auth/decorators/auth.decorator';
+import { DebtSummaryDto } from './dto/debt.dto';
+//import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
-@Controller('debt')
-export class DebtController {}
+@ApiTags('Debts')
+@Controller('debts')
+@ApiBearerAuth()
+//@UseGuards(JwtAuthGuard)
+export class DebtController {
+  constructor(private readonly debtService: DebtService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Tạo một nhắc nợ mới' })
+  @ApiResponse({
+    status: 201,
+    description: 'Nhắc nợ đã được tạo thành công.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Người dùng chưa đăng nhập',
+  })
+  async createDebt(
+    @BearerToken() accessToken: string,
+    @Body() createDebtDto: CreateDebtDto,
+  ) {
+    return this.debtService.createDebt(accessToken, createDebtDto);
+  }
+
+  @Get('my-debts')
+  @ApiOperation({
+    summary: 'Lấy danh sách các khoản nợ mà người dùng hiện tại bị nhắc',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Danh sách các khoản nợ được trả về thành công',
+  })
+  async getMyDebts(@BearerToken() accessToken: string) {
+    return this.debtService.getDebtsByDebtor(accessToken);
+  }
+
+  @Get('created-debts')
+  @ApiOperation({
+    summary: 'Lấy danh sách các khoản nợ mà người dùng hiện tại đã tạo',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Danh sách các khoản nợ đã tạo được trả về thành công',
+  })
+  async getCreatedDebts(@BearerToken() accessToken: string) {
+    return this.debtService.getDebtsByCreditor(accessToken);
+  }
+
+  @Get('summary')
+  @ApiOperation({
+    summary: 'Lấy tổng hợp danh sách các khoản nợ',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Danh sách nợ được trả về thành công',
+    type: DebtSummaryDto,
+  })
+  async getDebtsSummary(@BearerToken() accessToken: string) {
+    return this.debtService.getDebtsSummary(accessToken);
+  }
+}

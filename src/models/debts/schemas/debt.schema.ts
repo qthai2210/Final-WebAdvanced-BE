@@ -20,6 +20,9 @@ export class Debt {
   @Prop()
   content: string;
 
+  @Prop({ default: Date.now })
+  createdAt: Date;
+
   @Prop({ default: 'pending', enum: ['pending', 'paid', 'cancelled'] })
   status: string;
 
