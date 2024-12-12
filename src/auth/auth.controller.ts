@@ -1,11 +1,26 @@
-import { Controller, Post, Body, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  HttpStatus,
+  //UseGuards,
+  Request,
+  //HttpCode,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse as SwaggerResponse,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { LoginDto, RegisterDto } from './dto/auth.dto';
+import {
+  ChangePasswordDto,
+  ForgotPasswordDto,
+  LoginDto,
+  RegisterDto,
+  ResetPasswordDto,
+  VerifyOtpDto,
+} from './dto/auth.dto';
 import {
   ApiResponse,
   createSuccessResponse,
@@ -129,6 +144,66 @@ export class AuthController {
       return createErrorResponse(
         error.status || HttpStatus.UNAUTHORIZED,
         error.message || 'Re-login failed with token',
+      );
+    }
+  }
+
+  @Post('reset-password')
+  @ApiOperation({ summary: 'Reset password with OTP' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Password reset successful',
+  })
+  async resetPassword(
+    @Body() resetPasswordDto: ResetPasswordDto,
+  ): Promise<ApiResponse<{ message: string }>> {
+    try {
+      await this.authService.resetPassword(
+        resetPasswordDto.email,
+        resetPasswordDto.otp,
+        resetPasswordDto.newPassword,
+        resetPasswordDto.confirmPassword,
+      );
+      return createSuccessResponse({ message: 'Password reset successful' });
+    } catch (error) {
+      return createErrorResponse(
+        error.status || HttpStatus.BAD_REQUEST,
+        error.message || 'Password reset failed',
+      );
+    }
+  }
+
+  @Post('verify-otp')
+  @ApiOperation({ summary: 'Verify OTP code' })
+  async verifyOtp(@Body() verifyOtpDto: VerifyOtpDto) {
+    return this.authService.verifyOtp(verifyOtpDto.email, verifyOtpDto.otp);
+  }
+
+  @Post('forgot-password')
+  @ApiOperation({ summary: 'Request password reset' })
+  async forgotPassword(@Body() forgotPasswordDto: ForgotPasswordDto) {
+    return this.authService.forgotPassword(forgotPasswordDto.email);
+  }
+
+  @Post('change-password')
+  @ApiOperation({ summary: 'Change password' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Password changed successfully',
+  })
+  async changePassword(
+    @Request() req,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ): Promise<ApiResponse<{ message: string }>> {
+    try {
+      await this.authService.changePassword(req.user.id, changePasswordDto);
+      return createSuccessResponse({
+        message: 'Password changed successfully',
+      });
+    } catch (error) {
+      return createErrorResponse(
+        error.status || HttpStatus.BAD_REQUEST,
+        error.message || 'Failed to change password',
       );
     }
   }

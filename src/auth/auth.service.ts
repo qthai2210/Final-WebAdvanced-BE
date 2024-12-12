@@ -2,21 +2,24 @@ import {
   Injectable,
   UnauthorizedException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { User, UserDocument, UserStatus } from './schemas/user.schema';
-import { RegisterDto } from './dto/auth.dto';
+import { ChangePasswordDto, RegisterDto } from './dto/auth.dto';
 
 import { AuthData } from './interfaces/auth.interface';
+import { MailerService } from '@nestjs-modules/mailer';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private jwtService: JwtService,
+    private mailerService: MailerService,
   ) {}
 
   async register(registerDto: RegisterDto): Promise<AuthData> {
@@ -189,7 +192,175 @@ export class AuthService {
 
       return this.generateToken(user);
     } catch (error) {
+      console.error(error);
       throw new UnauthorizedException('Invalid or expired token');
     }
+  }
+
+  async changePassword(
+    userId: string,
+    changePasswordDto: ChangePasswordDto,
+  ): Promise<boolean> {
+    const user = await this.userModel.findById(userId).exec();
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    // Verify current password
+    const isCurrentPasswordValid = await bcrypt.compare(
+      changePasswordDto.currentPassword,
+      user.password,
+    );
+    if (!isCurrentPasswordValid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    // Verify new password matches confirmation
+    if (changePasswordDto.newPassword !== changePasswordDto.confirmPassword) {
+      throw new BadRequestException(
+        'New password and confirmation do not match',
+      );
+    }
+
+    // Hash and save new password
+    const hashedPassword = await bcrypt.hash(changePasswordDto.newPassword, 12);
+    user.password = hashedPassword;
+    await user.save();
+
+    return true;
+  }
+
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    const user = await this.userModel.findOne({ email }).exec();
+    if (!user) {
+      // Return success even if user not found to prevent email enumeration
+      return { message: 'If the email exists, a reset OTP will be sent' };
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiry = new Date();
+    otpExpiry.setMinutes(otpExpiry.getMinutes() + 15); // OTP valid for 15 minutes
+
+    // Save OTP and expiry to user
+    user.resetPasswordOTP = otp;
+    user.resetPasswordOTPExpires = otpExpiry;
+    await user.save();
+
+    // Send email with OTP
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'Password Reset Request',
+      html: `
+        <h3>Password Reset Request</h3>
+        <p>Your OTP for password reset is: <strong>${otp}</strong></p>
+        <p>This OTP will expire in 15 minutes.</p>
+        <p>If you did not request this password reset, please ignore this email.</p>
+      `,
+    });
+
+    return { message: 'Reset OTP has been sent to your email' };
+  }
+
+  async verifyOtp(email: string, otp: string): Promise<{ message: string }> {
+    const user = await this.userModel
+      .findOne({
+        email,
+        resetPasswordOTP: otp,
+        resetPasswordOTPExpires: { $gt: new Date() },
+      })
+      .exec();
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    return { message: 'OTP verified successfully' };
+  }
+
+  async resetPassword(
+    email: string,
+    otp: string,
+    newPassword: string,
+    confirmPassword: string,
+  ): Promise<{ message: string }> {
+    if (newPassword !== confirmPassword) {
+      throw new BadRequestException(
+        'New password and confirmation do not match',
+      );
+    }
+
+    const user = await this.userModel
+      .findOne({
+        email,
+        resetPasswordOTP: otp,
+        resetPasswordOTPExpires: { $gt: new Date() },
+      })
+      .exec();
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    // Update user password and clear OTP fields
+    user.password = hashedPassword;
+    user.resetPasswordOTP = undefined;
+    user.resetPasswordOTPExpires = undefined;
+    await user.save();
+
+    return { message: 'Password reset successful' };
+  }
+
+  async initiateForgotPassword(email: string): Promise<void> {
+    const user = await this.userModel.findOne({ email }).exec();
+    if (!user) {
+      // Return void to prevent email enumeration
+      return;
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiry = new Date();
+    otpExpiry.setMinutes(otpExpiry.getMinutes() + 15); // OTP valid for 15 minutes
+
+    user.resetPasswordOTP = otp;
+    user.resetPasswordOTPExpires = otpExpiry;
+    await user.save();
+
+    // Send email with OTP
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'Password Reset OTP',
+      text: `Your OTP for password reset is: ${otp}\nThis OTP will expire in 15 minutes.`,
+    });
+  }
+
+  async resetPasswordWithOTP(
+    email: string,
+    otp: string,
+    newPassword: string,
+  ): Promise<boolean> {
+    const user = await this.userModel
+      .findOne({
+        email,
+        resetPasswordOTP: otp,
+        resetPasswordOTPExpires: { $gt: new Date() },
+      })
+      .exec();
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    user.resetPasswordOTP = undefined;
+    user.resetPasswordOTPExpires = undefined;
+    await user.save();
+
+    return true;
   }
 }

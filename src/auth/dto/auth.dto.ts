@@ -6,6 +6,8 @@ import {
   IsOptional,
   MinLength,
   IsDateString,
+  Length,
+  IsNotEmpty,
 } from 'class-validator';
 import { UserRole } from '../schemas/user.schema';
 
@@ -67,4 +69,59 @@ export class RegisterDto {
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
+}
+
+export class ChangePasswordDto {
+  @ApiProperty({ description: 'Current password' })
+  @IsString()
+  @MinLength(6)
+  currentPassword: string;
+
+  @ApiProperty({ description: 'New password' })
+  @IsString()
+  @MinLength(6)
+  newPassword: string;
+
+  @ApiProperty({ description: 'Confirm new password' })
+  @IsString()
+  @MinLength(6)
+  confirmPassword: string;
+}
+
+export class ForgotPasswordDto {
+  @ApiProperty({ example: 'hoangduy161103@gmail.com' })
+  @IsEmail()
+  email: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty({ example: '123456', description: 'OTP code' })
+  @IsString()
+  @Length(6, 6)
+  otp: string;
+
+  @ApiProperty({ example: 'user@example.com' })
+  @IsEmail()
+  email: string;
+
+  @ApiProperty({ description: 'New password', minLength: 6 })
+  @IsString()
+  @MinLength(6)
+  newPassword: string;
+
+  @ApiProperty({ description: 'Confirm new password', minLength: 6 })
+  @IsString()
+  @MinLength(6)
+  confirmPassword: string;
+}
+
+export class VerifyOtpDto {
+  @ApiProperty({ example: 'user@example.com' })
+  @IsEmail()
+  email: string;
+
+  @ApiProperty({ example: '123456' })
+  @IsString()
+  @IsNotEmpty()
+  otp: string;
 }

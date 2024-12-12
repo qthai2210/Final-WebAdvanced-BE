@@ -29,6 +29,8 @@ export interface UserDocument extends Document {
   refreshToken?: string;
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
+  resetPasswordOTP?: string;
+  resetPasswordOTPExpires?: Date;
   failedLoginAttempts: number;
   lockUntil?: Date;
   isLocked(): boolean;
@@ -94,6 +96,12 @@ export class User {
 
   @Prop()
   lockUntil: Date;
+
+  @Prop()
+  resetPasswordOTP?: string;
+
+  @Prop()
+  resetPasswordOTPExpires?: Date;
 
   isLocked(): boolean {
     return !!(this.lockUntil && this.lockUntil > new Date());
