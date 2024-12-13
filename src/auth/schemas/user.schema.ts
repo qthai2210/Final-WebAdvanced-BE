@@ -13,34 +13,21 @@ export enum UserStatus {
   PENDING = 'pending',
 }
 
-export interface UserDocument extends Document {
-  _id: Types.ObjectId;
-  username: string;
-  password: string;
-  email: string;
-  phone: string;
-  fullName: string;
-  role: UserRole;
-  status: UserStatus;
-  identityNumber?: string;
-  dateOfBirth?: Date;
-  address?: string;
-  lastLoginAt?: Date;
-  refreshToken?: string;
-  resetPasswordToken?: string;
-  resetPasswordExpires?: Date;
-  resetPasswordOTP?: string;
-  resetPasswordOTPExpires?: Date;
-  failedLoginAttempts: number;
-  lockUntil?: Date;
-  isLocked(): boolean;
-}
+export type UserDocument = User & Document;
 
-@Schema({ timestamps: true })
+@Schema({
+  timestamps: true,
+  collection: 'users',
+  toJSON: {
+    virtuals: true,
+    transform: function (doc, ret) {
+      ret.id = ret._id;
+      delete ret.__v;
+      return ret;
+    },
+  },
+})
 export class User {
-  @Prop({ type: Types.ObjectId, auto: true })
-  _id: Types.ObjectId;
-
   @Prop({ required: true, unique: true })
   username: string;
 
@@ -108,7 +95,10 @@ export class User {
   }
 }
 
-export const UserSchema = SchemaFactory.createForClass(User);
+const UserSchema = SchemaFactory.createForClass(User);
+
+UserSchema.set('toObject', { virtuals: true });
+UserSchema.set('toJSON', { virtuals: true });
 
 // Add indexes
 UserSchema.index({ email: 1 });
@@ -116,7 +106,7 @@ UserSchema.index({ phone: 1 });
 UserSchema.index({ username: 1 });
 UserSchema.index({ identityNumber: 1 });
 
-// Add this method to schema
+// Add methods to schema
 UserSchema.methods.isLocked = function (): boolean {
   return !!(this.lockUntil && this.lockUntil > new Date());
 };
@@ -129,3 +119,5 @@ UserSchema.pre('save', function (next) {
   }
   next();
 });
+
+export { UserSchema };

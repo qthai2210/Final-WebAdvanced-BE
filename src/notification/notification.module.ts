@@ -34,7 +34,14 @@ import { NotificationGateway } from './notification.gateway';
       },
     ]),
   ],
-  providers: [NotificationService, NotificationGateway],
+  providers: [
+    NotificationGateway,
+    {
+      provide: 'INotificationGateway',
+      useClass: NotificationGateway,
+    },
+    NotificationService,
+  ],
   exports: [NotificationService],
 })
 export class NotificationModule {}

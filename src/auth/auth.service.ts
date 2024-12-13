@@ -23,32 +23,51 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto): Promise<AuthData> {
-    const existingUser = await this.userModel
-      .findOne({
-        $or: [
-          { username: registerDto.username },
-          { email: registerDto.email },
-          { phone: registerDto.phone },
-        ],
-      })
-      .exec();
+    try {
+      const existingUser = await this.userModel
+        .findOne({
+          $or: [
+            { username: registerDto.username },
+            { email: registerDto.email },
+            { phone: registerDto.phone },
+          ],
+        })
+        .exec();
 
-    if (existingUser) {
-      throw new ConflictException(
-        'Username, email or phone number already exists',
-      );
+      if (existingUser) {
+        throw new ConflictException(
+          'Username, email or phone number already exists',
+        );
+      }
+
+      const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+
+      // Create user document using plain object
+      const newUser = await this.userModel.create({
+        ...registerDto,
+        password: hashedPassword,
+        status: UserStatus.PENDING,
+        failedLoginAttempts: 0,
+      });
+
+      // Ensure the document is properly saved and populated
+      const savedUser = await newUser.save();
+      console.log('Created user document:', savedUser.toJSON());
+
+      return this.generateToken(savedUser);
+    } catch (error) {
+      console.error('Registration error details:', {
+        error: error.message,
+        stack: error.stack,
+        name: error.name,
+        fullError: error,
+      });
+
+      if (error.name === 'MongooseError') {
+        throw new BadRequestException(`Database error: ${error.message}`);
+      }
+      throw error;
     }
-
-    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
-    const newUser = new this.userModel({
-      ...registerDto,
-      password: hashedPassword,
-      status: UserStatus.PENDING,
-      failedLoginAttempts: 0,
-    });
-
-    const savedUser = await newUser.save();
-    return this.generateToken(savedUser);
   }
 
   async login(username: string, password: string): Promise<AuthData> {
