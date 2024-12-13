@@ -1,7 +1,7 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import * as amqp from 'amqplib';
+import { NotificationGateway } from './notification.gateway';
 
 import {
   Notification,
@@ -11,50 +11,51 @@ import { CreateNotificationDto } from './interfaces/notification.interface';
 import { User } from '../auth/schemas/user.schema';
 
 @Injectable()
-export class NotificationService implements OnModuleInit {
-  private connection: amqp.Connection;
-  private channel: amqp.Channel;
-
+export class NotificationService {
   constructor(
     @InjectModel(Notification.name)
     private notificationModel: Model<NotificationDocument>,
     @InjectModel(User.name)
     private userModel: Model<User>,
+    private notificationGateway: NotificationGateway,
   ) {}
-
-  async onModuleInit() {
-    await this.connectQueue();
-  }
-
-  private async connectQueue() {
-    try {
-      this.connection = await amqp.connect(process.env.RABBITMQ_URL);
-      this.channel = await this.connection.createChannel();
-      await this.channel.assertQueue(process.env.RABBITMQ_QUEUE, {
-        durable: true,
-      });
-      console.log('RabbitMQ connected successfully');
-    } catch (error) {
-      console.error('RabbitMQ connection error:', error);
-      // Add retry logic
-      setTimeout(() => this.connectQueue(), 5000);
-    }
-  }
 
   async createNotification(
     createNotificationDto: CreateNotificationDto,
   ): Promise<Notification> {
     try {
       const notification = new this.notificationModel(createNotificationDto);
-      await this.channel?.sendToQueue(
-        process.env.RABBITMQ_QUEUE,
-        Buffer.from(JSON.stringify(createNotificationDto)),
+      const savedNotification = await notification.save();
+
+      // Gửi notification ngay nếu user online
+      const isUserOnline = this.notificationGateway.isUserOnline(
+        createNotificationDto.userId,
       );
-      return await notification.save();
+      if (isUserOnline) {
+        this.notificationGateway.sendNotificationToUser(
+          createNotificationDto.userId,
+          savedNotification,
+        );
+      }
+
+      return savedNotification;
     } catch (error) {
       console.error('Error creating notification:', error);
       throw error;
     }
+  }
+
+  async getUnreadNotifications(userId: string): Promise<Notification[]> {
+    return this.notificationModel
+      .find({
+        userId,
+        isRead: false,
+        createdAt: {
+          $gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // Trong 24h
+        },
+      })
+      .sort({ createdAt: -1 })
+      .exec();
   }
 
   async getNotificationsByUser(userId: string): Promise<Notification[]> {
@@ -64,15 +65,27 @@ export class NotificationService implements OnModuleInit {
       .exec();
   }
 
-  async consumeNotifications() {
+  // Xử lý khi user online trở lại
+  async handleUserReconnect(userId: string) {
     try {
-      this.channel.consume(process.env.RABBITMQ_QUEUE, (data) => {
-        const notification = JSON.parse(data.content);
-        console.log('Received notification:', notification);
-        this.channel.ack(data);
+      // Lấy các notification chưa đọc từ database
+      const unreadNotifications = await this.notificationModel
+        .find({
+          userId,
+          isRead: false,
+          createdAt: {
+            $gte: new Date(Date.now() - 24 * 60 * 60 * 1000), // Trong 24h
+          },
+        })
+        .sort({ createdAt: -1 })
+        .exec();
+
+      // Gửi lại cho user
+      unreadNotifications.forEach((notification) => {
+        this.notificationGateway.sendNotificationToUser(userId, notification);
       });
     } catch (error) {
-      console.error('Error consuming notifications:', error);
+      console.error('Error handling user reconnect:', error);
     }
   }
 }
