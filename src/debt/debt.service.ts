@@ -21,6 +21,8 @@ import { User } from '../auth/schemas/user.schema'; // Thêm import này
 import { JwtUtil } from 'src/utils/jwt.util';
 import { MailService } from '../mail/mail.service'; // Thêm import này
 import { AuthService } from 'src/auth/auth.service';
+import { Account } from '../models/accounts/schemas/account.schema';
+import { Transaction } from '../models/transactions/schemas/transaction.schema';
 
 @Injectable()
 export class DebtService {
@@ -32,6 +34,8 @@ export class DebtService {
     private mailService: MailService,
     private JWTUtil: JwtUtil,
     private authService: AuthService, // Thêm authService
+    @InjectModel(Account.name) private accountModel: Model<Account>,
+    @InjectModel(Transaction.name) private transactionModel: Model<Transaction>,
   ) {}
 
   private decodeToken(accessToken: string) {
@@ -199,53 +203,94 @@ export class DebtService {
   }
 
   async payDebt(accessToken: string, payDebtDto: PayDebtDto) {
-    const decoded = this.decodeToken(accessToken);
+    const session = await this.debtModel.startSession();
+    session.startTransaction();
 
-    // Lấy thông tin user đầy đủ từ database
-    const user = await this.userModel.findById(decoded.sub);
-    if (!user) {
-      throw new UnauthorizedException('User not found');
+    try {
+      const decoded = this.decodeToken(accessToken);
+      const user = await this.userModel.findById(decoded.sub);
+      if (!user) throw new UnauthorizedException('User not found');
+
+      const debt = await this.debtModel.findById(payDebtDto.debtId);
+      if (!debt) throw new NotFoundException('Debt not found');
+
+      if (debt.status === 'paid')
+        throw new BadRequestException('Debt already paid');
+
+      if (debt.toUserId.toString() !== user._id.toString())
+        throw new BadRequestException('You are not the debtor');
+
+      // Verify OTP
+      const isValidOtp = await this.mailService.verifyOtp(
+        user.email,
+        payDebtDto.otp,
+      );
+      if (!isValidOtp) throw new BadRequestException('Invalid OTP');
+
+      // Get accounts for both users
+      const [debtorAccount, creditorAccount] = await Promise.all([
+        this.accountModel.findOne({ userId: debt.toUserId, type: 'payment' }),
+        this.accountModel.findOne({ userId: debt.fromUserId, type: 'payment' }),
+      ]);
+
+      if (!debtorAccount || !creditorAccount)
+        throw new BadRequestException('Payment accounts not found');
+
+      if (debtorAccount.balance < debt.amount)
+        throw new BadRequestException('Insufficient balance');
+
+      // Create transaction record
+      const transaction = new this.transactionModel({
+        fromAccount: debtorAccount.accountNumber,
+        toAccount: creditorAccount.accountNumber,
+        amount: debt.amount,
+        type: 'debt_payment',
+        status: 'completed',
+        content: `Payment for debt: ${debt.content}`,
+        fee: 0,
+        feeType: 'sender',
+      });
+
+      // Update account balances
+      await Promise.all([
+        this.accountModel.findByIdAndUpdate(
+          debtorAccount._id,
+          { $inc: { balance: -debt.amount } },
+          { session },
+        ),
+        this.accountModel.findByIdAndUpdate(
+          creditorAccount._id,
+          { $inc: { balance: debt.amount } },
+          { session },
+        ),
+        transaction.save({ session }),
+        this.debtModel.findByIdAndUpdate(
+          payDebtDto.debtId,
+          {
+            status: 'paid',
+            paidAt: new Date(),
+            transactionId: transaction._id,
+          },
+          { session, new: true },
+        ),
+      ]);
+
+      // Send notification
+      await this.notificationService.createNotification({
+        userId: debt.fromUserId.toString(),
+        content: `Your debt of ${debt.amount} has been paid`,
+        type: 'DEBT_PAYMENT',
+        relatedId: debt._id.toString(),
+      });
+
+      await session.commitTransaction();
+      return transaction;
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
     }
-
-    const debt = await this.debtModel.findById(payDebtDto.debtId);
-    if (!debt) {
-      throw new NotFoundException('Debt not found');
-    }
-
-    if (debt.status === 'paid') {
-      throw new BadRequestException('Debt already paid');
-    }
-
-    if (debt.toUserId.toString() !== user._id.toString()) {
-      throw new BadRequestException('You are not the debtor');
-    }
-
-    // Verify OTP với mailService thay vì authService
-    const isValidOtp = await this.mailService.verifyOtp(
-      user.email,
-      payDebtDto.otp,
-    );
-
-    if (!isValidOtp) {
-      throw new BadRequestException('Invalid OTP');
-    }
-
-    // Process payment
-    const updatedDebt = await this.debtModel.findByIdAndUpdate(
-      payDebtDto.debtId,
-      { status: 'paid', paidAt: new Date() },
-      { new: true },
-    );
-
-    // Send notification to debt creator
-    await this.notificationService.createNotification({
-      userId: debt.fromUserId.toString(),
-      content: `Your debt of ${debt.amount} has been paid`,
-      type: 'DEBT_PAYMENT',
-      relatedId: debt._id.toString(),
-    });
-
-    return updatedDebt;
   }
 
   async sendPaymentOtp(accessToken: string, sendOtpDto: SendPaymentOtpDto) {
