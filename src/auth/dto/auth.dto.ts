@@ -125,3 +125,58 @@ export class VerifyOtpDto {
   @IsNotEmpty()
   otp: string;
 }
+
+export class RegisterWithoutPasswordDto {
+  @ApiProperty({ example: 'johndoe', description: 'Unique username' })
+  @IsString()
+  username: string;
+
+  @ApiProperty({
+    example: 'john@example.com',
+    description: 'Valid email address',
+  })
+  @IsEmail()
+  email: string;
+
+  @ApiProperty({ example: '+1234567890', description: 'Phone number' })
+  @IsString()
+  phone: string;
+
+  @ApiProperty({ example: 'John Doe', description: 'Full name of the user' })
+  @IsString()
+  fullName: string;
+
+  @ApiPropertyOptional({ example: 'ID123456', description: 'Identity number' })
+  @IsOptional()
+  @IsString()
+  identityNumber?: string;
+
+  @ApiPropertyOptional({ example: '1990-01-01', description: 'Date of birth' })
+  @IsOptional()
+  @IsDateString()
+  dateOfBirth?: Date;
+
+  @ApiPropertyOptional({ example: '123 Main St', description: 'User address' })
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @ApiPropertyOptional({ enum: UserRole, default: UserRole.CUSTOMER })
+  @IsOptional()
+  @IsEnum(UserRole)
+  role?: UserRole;
+}
+
+export class verifyRegisterOtpDto {
+  @ApiProperty({
+    example: 'john@example.com',
+    description: 'Valid email address',
+  })
+  @IsEmail()
+  email: string;
+
+  @ApiProperty({ example: '123456', description: 'Valid OTP' })
+  @IsString()
+  @Length(6, 6)
+  otp: string;
+}

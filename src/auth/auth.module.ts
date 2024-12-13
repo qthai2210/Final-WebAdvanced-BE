@@ -8,11 +8,13 @@ import { AuthController } from './auth.controller';
 import { User, UserSchema } from './schemas/user.schema';
 import { ConfigService } from '@nestjs/config';
 import { MailModule } from 'src/mail/mail.module';
+import { AccountsModule } from 'src/accounts/accounts.module';
 
 @Module({
   imports: [
     MailModule,
     PassportModule,
+    AccountsModule,
     JwtModule.registerAsync({
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
@@ -26,4 +28,4 @@ import { MailModule } from 'src/mail/mail.module';
   controllers: [AuthController],
   exports: [AuthService],
 })
-export class AuthModule {}
+export class AuthModule { }

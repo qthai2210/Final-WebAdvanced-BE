@@ -11,6 +11,7 @@ import { DebtModule } from './debt/debt.module';
 import { NotificationModule } from './notification/notification.module';
 import { MailModule } from './mail/mail.module';
 import { UtilsModule } from './utils/utils.module';
+import { AccountsModule } from './accounts/accounts.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { UtilsModule } from './utils/utils.module';
     NotificationModule,
     MailModule,
     UtilsModule,
+    AccountsModule,
 
     // AccountsModule,
     // TransactionsModule,
@@ -57,4 +59,4 @@ import { UtilsModule } from './utils/utils.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
