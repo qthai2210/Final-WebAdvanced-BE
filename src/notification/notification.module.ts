@@ -9,6 +9,7 @@ import {
 } from './schemas/notification.schema';
 import { AuthModule } from '../auth/auth.module'; // Add this
 import { UserSchema } from 'src/auth/schemas/user.schema';
+import { NotificationGateway } from './notification.gateway';
 
 @Module({
   imports: [
@@ -33,7 +34,7 @@ import { UserSchema } from 'src/auth/schemas/user.schema';
       },
     ]),
   ],
-  providers: [NotificationService],
+  providers: [NotificationService, NotificationGateway],
   exports: [NotificationService],
 })
 export class NotificationModule {}
