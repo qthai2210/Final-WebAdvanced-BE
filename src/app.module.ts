@@ -11,6 +11,7 @@ import { DebtModule } from './debt/debt.module';
 import { NotificationModule } from './notification/notification.module';
 import { MailModule } from './mail/mail.module';
 import { UtilsModule } from './utils/utils.module';
+import { TransactionModule } from './transaction/transaction.module';
 import { AccountsModule } from './accounts/accounts.module';
 
 @Module({
@@ -48,6 +49,7 @@ import { AccountsModule } from './accounts/accounts.module';
     NotificationModule,
     MailModule,
     UtilsModule,
+    TransactionModule,
     AccountsModule,
 
     // AccountsModule,
