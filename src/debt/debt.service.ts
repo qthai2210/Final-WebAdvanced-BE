@@ -56,12 +56,12 @@ export class DebtService {
 
     const newDebt = new this.debtModel({
       fromUserId: user.sub,
-      toUserId: createDebtDto.toUserId,
+      //toUserId: createDebtDto.toUserId,
       amount: createDebtDto.amount,
       content: createDebtDto.content,
       status: 'pending',
     });
-
+    console.log(newDebt);
     return (await newDebt.save()).populate(['fromUserId', 'toUserId']);
   }
 
@@ -112,12 +112,12 @@ export class DebtService {
     const formatDebt = (debt: DebtDocument): DebtDetailDto => ({
       _id: debt._id.toString(),
       fromUser: {
-        _id: debt.fromUserId._id.toString(),
+        _id: debt.fromUserId.toString(),
         fullName: debt.fromUserId.fullName,
         username: debt.fromUserId.username,
       },
       toUser: {
-        _id: debt.toUserId._id.toString(),
+        _id: debt.toUserId.toString(),
         fullName: debt.toUserId.fullName,
         username: debt.toUserId.username,
       },
@@ -172,10 +172,10 @@ export class DebtService {
 
       // Gửi thông báo
       const isCancelledByCreator =
-        debt.fromUserId._id.toString() === user.sub.toString();
+        debt.fromUserId.toString() === user.sub.toString();
       const notifyUserId = isCancelledByCreator
-        ? debt.toUserId._id.toString()
-        : debt.fromUserId._id.toString();
+        ? debt.toUserId.toString()
+        : debt.fromUserId.toString();
 
       const notificationContent = isCancelledByCreator
         ? `Người tạo nợ ${debt.fromUserId.fullName} đã huỷ khoản nợ "${debt.content}" với lý do: ${cancelDebtDto.cancelReason}`

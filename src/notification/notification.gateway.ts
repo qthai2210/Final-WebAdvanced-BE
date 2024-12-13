@@ -1,3 +1,4 @@
+import { Injectable } from '@nestjs/common';
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -5,22 +6,26 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { NotificationService } from './notification.service';
+import { INotificationGateway } from './interfaces/notification-gateway.interface';
 
+@Injectable()
 @WebSocketGateway({
   cors: {
     origin: '*',
   },
 })
 export class NotificationGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayConnection, OnGatewayDisconnect, INotificationGateway
 {
   @WebSocketServer()
   server: Server;
 
   private userSockets = new Map<string, string>();
+  private onUserConnectedCallback: (userId: string) => void;
 
-  constructor(private notificationService: NotificationService) {}
+  setOnUserConnectedCallback(callback: (userId: string) => void) {
+    this.onUserConnectedCallback = callback;
+  }
 
   handleConnection(client: Socket) {
     const userId = client.handshake.query.userId as string;
@@ -28,8 +33,9 @@ export class NotificationGateway
       this.userSockets.set(userId, client.id);
       console.log(`Client connected: ${userId}`);
 
-      // Khi user kết nối lại, gửi các notification đã bị miss
-      this.notificationService.handleUserReconnect(userId);
+      if (this.onUserConnectedCallback) {
+        this.onUserConnectedCallback(userId);
+      }
     }
   }
 

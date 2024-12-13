@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit, Inject } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { NotificationGateway } from './notification.gateway';
+import { INotificationGateway } from './interfaces/notification-gateway.interface';
 
 import {
   Notification,
@@ -11,14 +11,24 @@ import { CreateNotificationDto } from './interfaces/notification.interface';
 import { User } from '../auth/schemas/user.schema';
 
 @Injectable()
-export class NotificationService {
+export class NotificationService implements OnModuleInit {
   constructor(
     @InjectModel(Notification.name)
     private notificationModel: Model<NotificationDocument>,
     @InjectModel(User.name)
     private userModel: Model<User>,
-    private notificationGateway: NotificationGateway,
+    @Inject('INotificationGateway')
+    private notificationGateway: INotificationGateway,
   ) {}
+
+  onModuleInit() {
+    // Set callback for when user connects
+    (this.notificationGateway as any).setOnUserConnectedCallback(
+      (userId: string) => {
+        this.handleUserReconnect(userId);
+      },
+    );
+  }
 
   async createNotification(
     createNotificationDto: CreateNotificationDto,
