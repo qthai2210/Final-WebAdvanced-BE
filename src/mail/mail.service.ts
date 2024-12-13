@@ -9,7 +9,7 @@ export class MailService {
   constructor(
     private mailerService: MailerService,
     @InjectModel(User.name) private userModel: Model<User>,
-  ) {}
+  ) { }
 
   async sendUserConfirmation(user: User, token: string) {
     const url = `example.com/auth/confirm?token=${token}`;
@@ -52,5 +52,43 @@ export class MailService {
     }
 
     return true;
+  }
+
+  async sendOtpToVerifyUserAccount(email: string, otp: string): Promise<boolean> {
+    try {
+      await this.mailerService.sendMail({
+        to: email,
+        subject: 'Verify User Account OTP',
+        html: `
+          <h3>Verify User Account Request</h3>
+          <p>Your OTP for verify user account is: <strong>${otp}</strong></p>
+          <p>This OTP will expire in 15 minutes.</p>
+          <p>If you did not request this password reset, please ignore this email.</p>
+        `,
+      });
+      return true;
+    } catch (error) {
+      console.error(error);
+      return false;
+    }
+
+  }
+
+  async sendPasswordUserAccount(email: string, password: string): Promise<boolean> {
+    try {
+      await this.mailerService.sendMail({
+        to: email,
+        subject: 'User Account Password',
+        html: `
+          <h3>User Account Password</h3>
+          <p>This is the password for your account: <strong>${password}</strong></p>
+        `,
+      });
+      return true;
+    } catch (error) {
+      console.error(error);
+      return false;
+    }
+
   }
 }

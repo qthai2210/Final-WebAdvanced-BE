@@ -12,6 +12,7 @@ import { NotificationModule } from './notification/notification.module';
 import { MailModule } from './mail/mail.module';
 import { UtilsModule } from './utils/utils.module';
 import { TransactionModule } from './transaction/transaction.module';
+import { AccountsModule } from './accounts/accounts.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { TransactionModule } from './transaction/transaction.module';
     MailModule,
     UtilsModule,
     TransactionModule,
+    AccountsModule,
 
     // AccountsModule,
     // TransactionsModule,
@@ -59,4 +61,4 @@ import { TransactionModule } from './transaction/transaction.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

@@ -18,8 +18,10 @@ import {
   ForgotPasswordDto,
   LoginDto,
   RegisterDto,
+  RegisterWithoutPasswordDto,
   ResetPasswordDto,
   VerifyOtpDto,
+  verifyRegisterOtpDto,
 } from './dto/auth.dto';
 import {
   ApiResponse,
@@ -36,7 +38,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly mailService: MailService,
-  ) {}
+  ) { }
 
   @Post('login')
   @ApiOperation({ summary: 'User login' })
@@ -210,5 +212,25 @@ export class AuthController {
         error.message || 'Failed to change password',
       );
     }
+  }
+
+  @Post('register-with-otp')
+  @ApiOperation({ summary: 'Register a user account with OTP verification' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Registered successfully',
+  })
+  async registerWithOtpVerification(@Body() registerDto: RegisterWithoutPasswordDto) {
+    return this.authService.registerWithOtpVerification(registerDto);
+  }
+
+  @Post('verify-register-otp')
+  @ApiOperation({ summary: 'Verify OTP when registering a user account' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Verified successfully',
+  })
+  async verifyRegisterOtp(@Body() body: verifyRegisterOtpDto) {
+    return this.authService.verifyRegisterOtp(body.email, body.otp);
   }
 }
