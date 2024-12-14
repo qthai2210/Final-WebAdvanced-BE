@@ -3,13 +3,15 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from '../auth/schemas/user.schema';
+import { Transaction } from 'src/models/transactions/schemas/transaction.schema';
 
 @Injectable()
 export class MailService {
   constructor(
     private mailerService: MailerService,
     @InjectModel(User.name) private userModel: Model<User>,
-  ) { }
+    @InjectModel(Transaction.name) private transactionModel: Model<Transaction>,
+  ) {}
 
   async sendUserConfirmation(user: User, token: string) {
     const url = `example.com/auth/confirm?token=${token}`;
@@ -54,7 +56,10 @@ export class MailService {
     return true;
   }
 
-  async sendOtpToVerifyUserAccount(email: string, otp: string): Promise<boolean> {
+  async sendOtpToVerifyUserAccount(
+    email: string,
+    otp: string,
+  ): Promise<boolean> {
     try {
       await this.mailerService.sendMail({
         to: email,
@@ -71,10 +76,12 @@ export class MailService {
       console.error(error);
       return false;
     }
-
   }
 
-  async sendPasswordUserAccount(email: string, password: string): Promise<boolean> {
+  async sendPasswordUserAccount(
+    email: string,
+    password: string,
+  ): Promise<boolean> {
     try {
       await this.mailerService.sendMail({
         to: email,
@@ -89,6 +96,30 @@ export class MailService {
       console.error(error);
       return false;
     }
+  }
 
+  async sendOtpToVerifyTransaction(
+    email: string,
+    transactionId: string,
+  ): Promise<void> {
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiry = new Date();
+    otpExpiry.setMinutes(otpExpiry.getMinutes() + 15); // OTP valid for 15 minutes
+
+    await this.transactionModel.findByIdAndUpdate(transactionId, {
+      otp: otp,
+      otpExpired: otpExpiry,
+    });
+
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'OTP for Transaction Verification',
+      html: `
+        <h3>Transaction Verification</h3>
+        <p>Your OTP for transaction verification is: <strong>${otp}</strong></p>
+        <p>This OTP will expire in 15 minutes.</p>
+        <p>If you did not initiate this transaction, please contact support immediately.</p>
+      `,
+    });
   }
 }

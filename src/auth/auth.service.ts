@@ -282,7 +282,6 @@ export class AuthService {
 
   async resetPassword(
     email: string,
-    otp: string,
     newPassword: string,
     confirmPassword: string,
   ): Promise<{ message: string }> {
@@ -295,8 +294,6 @@ export class AuthService {
     const user = await this.userModel
       .findOne({
         email,
-        resetPasswordOTP: otp,
-        resetPasswordOTPExpires: { $gt: new Date() },
       })
       .exec();
 
@@ -309,8 +306,6 @@ export class AuthService {
 
     // Update user password and clear OTP fields
     user.password = hashedPassword;
-    user.resetPasswordOTP = undefined;
-    user.resetPasswordOTPExpires = undefined;
     await user.save();
 
     return { message: 'Password reset successful' };

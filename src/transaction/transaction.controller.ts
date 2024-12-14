@@ -1,12 +1,21 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { TransactionService } from './transaction.service';
 import {
   TransactionHistoryQueryDto,
   TransactionHistoryResponseDto,
 } from './dto/transaction-history.dto';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
+import { InternalTransferDto } from './dto/transaction-create.dto';
+import { BearerToken } from 'src/auth/decorators/auth.decorator';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
 
 @ApiTags('transactions')
+@ApiBearerAuth()
 @Controller('transactions')
 export class TransactionController {
   constructor(private readonly transactionService: TransactionService) {}
@@ -33,5 +42,28 @@ export class TransactionController {
     @Query() query: TransactionHistoryQueryDto,
   ): Promise<TransactionHistoryResponseDto[]> {
     return this.transactionService.getTransactionHistory(query);
+  }
+
+  @Post('internal-transfer')
+  @ApiOperation({ summary: 'Initiate internal transfer' })
+  @ApiResponse({ status: 201, description: 'Internal transfer initiated' })
+  async initiateInternalTransfer(
+    @Body() internalTransferDto: InternalTransferDto,
+    @BearerToken() accessToken: string,
+  ) {
+    return this.transactionService.initiateInternalTransfer(
+      accessToken,
+      internalTransferDto,
+    );
+  }
+
+  @Post('verify-otp')
+  @ApiOperation({ summary: 'Verify OTP for transaction' })
+  @ApiResponse({
+    status: 200,
+    description: 'OTP verified and transaction completed',
+  })
+  async verifyOtp(@Body() verifyOtpDto: VerifyOtpDto) {
+    return this.transactionService.verifyOtp(verifyOtpDto);
   }
 }

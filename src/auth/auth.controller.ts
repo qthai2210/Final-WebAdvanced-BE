@@ -4,7 +4,7 @@ import {
   Body,
   HttpStatus,
   //UseGuards,
-  Request,
+  //Request,
   //HttpCode,
 } from '@nestjs/common';
 import {
@@ -168,7 +168,6 @@ export class AuthController {
     try {
       await this.authService.resetPassword(
         resetPasswordDto.email,
-        resetPasswordDto.otp,
         resetPasswordDto.newPassword,
         resetPasswordDto.confirmPassword,
       );
