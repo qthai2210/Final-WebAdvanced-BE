@@ -58,9 +58,23 @@ export class DebtService {
   ): Promise<Debt> {
     const user = this.decodeToken(accessToken);
 
+    const account = await this.accountModel.findOne({
+      accountNumber: createDebtDto.accountNumber,
+    });
+
+    if (!account) {
+      throw new NotFoundException('Account not found');
+    }
+
+    const toUserId = await this.userModel.findById(account.userId);
+
+    if (!toUserId) {
+      throw new NotFoundException('User not found');
+    }
+
     const newDebt = new this.debtModel({
       fromUserId: user.sub,
-      //toUserId: createDebtDto.toUserId,
+      toUserId: toUserId,
       amount: createDebtDto.amount,
       content: createDebtDto.content,
       status: 'pending',

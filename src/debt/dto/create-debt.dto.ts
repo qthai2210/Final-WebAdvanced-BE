@@ -4,7 +4,7 @@ import { IsNotEmpty, IsNumber, IsString } from 'class-validator';
 export class CreateDebtDto {
   @ApiProperty({
     description: 'Số tài khoản người bị nợ',
-    example: '9876543210',
+    example: '9666048417',
   })
   @IsNotEmpty({ message: 'Số tài khoản không được để trống' })
   @IsString({ message: 'Số tài khoản phải là chuỗi ký tự' })
