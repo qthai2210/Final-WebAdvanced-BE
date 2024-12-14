@@ -9,7 +9,11 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
 import { User, UserDocument, UserStatus } from './schemas/user.schema';
-import { ChangePasswordDto, RegisterDto, RegisterWithoutPasswordDto } from './dto/auth.dto';
+import {
+  ChangePasswordDto,
+  RegisterDto,
+  RegisterWithoutPasswordDto,
+} from './dto/auth.dto';
 
 import { AuthData } from './interfaces/auth.interface';
 import { MailService } from 'src/mail/mail.service';
@@ -21,8 +25,8 @@ export class AuthService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private jwtService: JwtService,
     private mailService: MailService,
-    private accountsService: AccountsService
-  ) { }
+    private accountsService: AccountsService,
+  ) {}
 
   async register(registerDto: RegisterDto): Promise<AuthData> {
     try {
@@ -219,10 +223,12 @@ export class AuthService {
   }
 
   async changePassword(
-    userId: string,
+    accessToken: string,
     changePasswordDto: ChangePasswordDto,
   ): Promise<boolean> {
-    const user = await this.userModel.findById(userId).exec();
+    const payload = this.jwtService.verify(accessToken);
+    console.log('Payload:', payload);
+    const user = await this.userModel.findById(payload.sub).exec();
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
@@ -356,7 +362,9 @@ export class AuthService {
     return true;
   }
 
-  async registerWithOtpVerification(registerDto: RegisterWithoutPasswordDto): Promise<boolean> {
+  async registerWithOtpVerification(
+    registerDto: RegisterWithoutPasswordDto,
+  ): Promise<boolean> {
     try {
       const existingUser = await this.userModel
         .findOne({
@@ -374,7 +382,7 @@ export class AuthService {
         );
       }
 
-      let tempPassword = "123456"
+      const tempPassword = '123456';
       const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
       // Create user document using plain object
@@ -394,18 +402,17 @@ export class AuthService {
       // Save OTP and expiry to user
       newUser.resetPasswordOTP = otp;
       newUser.resetPasswordOTPExpires = otpExpiry;
-      let authData = this.generateToken(newUser);
+      const authData = this.generateToken(newUser);
       newUser.refreshToken = authData.refresh_token;
       await newUser.save();
 
+      const isOtpSent = await this.mailService.sendOtpToVerifyUserAccount(
+        newUser.email,
+        otp,
+      );
 
-      let isOtpSent = await this.mailService.sendOtpToVerifyUserAccount(newUser.email, otp);
-
-      if (isOtpSent)
-        return true;
-      else
-        return false;
-
+      if (isOtpSent) return true;
+      else return false;
     } catch (error) {
       console.error('Registration error details:', {
         error: error.message,
@@ -426,15 +433,14 @@ export class AuthService {
     if (isOtpVerified) {
       const existingUser = await this.userModel
         .findOne({
-          $or: [
-            { email: email },
-          ],
+          $or: [{ email: email }],
         })
         .exec();
 
       existingUser.isLocked = () => false;
 
-      const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      const characters =
+        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
       const passwordLength = 8;
       let password = '';
 
@@ -445,13 +451,13 @@ export class AuthService {
       existingUser.password = await bcrypt.hash(password, 10);
       await this.mailService.sendPasswordUserAccount(email, password);
       await existingUser.save();
-      let authData = await this.refreshToken(existingUser.refreshToken);
-      let newPaymentAccount = await this.accountsService.createOne(authData.access_token);
+      const authData = await this.refreshToken(existingUser.refreshToken);
+      const newPaymentAccount = await this.accountsService.createOne(
+        authData.access_token,
+      );
 
-      if (newPaymentAccount)
-        return true;
-      else
-        return false;
+      if (newPaymentAccount) return true;
+      else return false;
     }
   }
 }

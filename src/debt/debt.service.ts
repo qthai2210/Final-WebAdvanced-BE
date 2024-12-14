@@ -87,17 +87,20 @@ export class DebtService {
     const user = this.decodeToken(accessToken);
     return this.debtModel
       .find({ toUserId: user.sub })
-      .populate(['fromUserId', 'toUserId', 'transactionId'])
-      .exec();
+      .populate('fromUserId', '_id fullName')
+      .populate('toUserId', '_id fullName')
+      .lean()
+      .exec() as unknown as Debt[];
   }
 
   async getDebtsByCreditor(accessToken: string): Promise<Debt[]> {
     const user = this.decodeToken(accessToken);
-
     return this.debtModel
       .find({ fromUserId: user.sub })
-      .populate(['fromUserId', 'toUserId', 'transactionId'])
-      .exec();
+      .populate('fromUserId', '_id fullName')
+      .populate('toUserId', '_id fullName')
+      .lean()
+      .exec() as unknown as Debt[];
   }
 
   async getDebtsSummary(accessToken: string): Promise<DebtSummaryDto> {
