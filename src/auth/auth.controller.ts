@@ -11,6 +11,7 @@ import {
   ApiTags,
   ApiOperation,
   ApiResponse as SwaggerResponse,
+  ApiBearerAuth,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import {
@@ -33,12 +34,13 @@ import { BearerToken } from './decorators/auth.decorator';
 import { MailService } from '../mail/mail.service';
 
 @ApiTags('Authentication')
+@ApiBearerAuth()
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly mailService: MailService,
-  ) { }
+  ) {}
 
   @Post('login')
   @ApiOperation({ summary: 'User login' })
@@ -198,11 +200,12 @@ export class AuthController {
     description: 'Password changed successfully',
   })
   async changePassword(
-    @Request() req,
+    @BearerToken() accessToken: string,
     @Body() changePasswordDto: ChangePasswordDto,
   ): Promise<ApiResponse<{ message: string }>> {
     try {
-      await this.authService.changePassword(req.user.id, changePasswordDto);
+      console.log('accessToken', accessToken);
+      await this.authService.changePassword(accessToken, changePasswordDto);
       return createSuccessResponse({
         message: 'Password changed successfully',
       });
@@ -220,7 +223,9 @@ export class AuthController {
     status: 200,
     description: 'Registered successfully',
   })
-  async registerWithOtpVerification(@Body() registerDto: RegisterWithoutPasswordDto) {
+  async registerWithOtpVerification(
+    @Body() registerDto: RegisterWithoutPasswordDto,
+  ) {
     return this.authService.registerWithOtpVerification(registerDto);
   }
 
