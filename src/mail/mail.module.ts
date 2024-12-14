@@ -5,6 +5,10 @@ import { MailService } from './mail.service';
 import { join } from 'path';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from '../auth/schemas/user.schema';
+import {
+  Transaction,
+  TransactionSchema,
+} from 'src/models/transactions/schemas/transaction.schema';
 
 @Global()
 @Module({
@@ -38,6 +42,9 @@ import { User, UserSchema } from '../auth/schemas/user.schema';
       }),
     }),
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+    MongooseModule.forFeature([
+      { name: Transaction.name, schema: TransactionSchema },
+    ]),
   ],
   providers: [MailService],
   exports: [MailService], // 👈 export for DI

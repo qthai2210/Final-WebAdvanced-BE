@@ -79,8 +79,12 @@ export class DebtService {
       content: createDebtDto.content,
       status: 'pending',
     });
-    console.log(newDebt);
-    return (await newDebt.save()).populate(['fromUserId', 'toUserId']);
+    //console.log(newDebt);
+    const savedDebt = await newDebt.save();
+    return (await savedDebt.populate('fromUserId', '_id fullName')).populate(
+      'toUserId',
+      '_id fullName',
+    );
   }
 
   async getDebtsByDebtor(accessToken: string): Promise<Debt[]> {
@@ -110,12 +114,14 @@ export class DebtService {
     const [createdDebts, receivedDebts] = await Promise.all([
       this.debtModel
         .find({ fromUserId: user.sub })
-        .populate(['fromUserId', 'toUserId'])
+        .populate('fromUserId', '_id fullName')
+        .populate('toUserId', '_id fullName')
         .sort({ createdAt: -1 })
         .exec(),
       this.debtModel
         .find({ toUserId: user.sub })
-        .populate(['fromUserId', 'toUserId'])
+        .populate('fromUserId', '_id fullName')
+        .populate('toUserId', '_id fullName')
         .sort({ createdAt: -1 })
         .exec(),
     ]);
@@ -182,7 +188,8 @@ export class DebtService {
             runValidators: true,
           },
         )
-        .populate(['fromUserId', 'toUserId'])
+        .populate('fromUserId', '_id fullName')
+        .populate('toUserId', '_id fullName')
         .exec();
 
       if (!debt) {

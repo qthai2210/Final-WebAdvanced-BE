@@ -1,4 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Transaction } from '../models/transactions/schemas/transaction.schema';
@@ -6,11 +11,21 @@ import {
   TransactionHistoryQueryDto,
   TransactionHistoryResponseDto,
 } from './dto/transaction-history.dto';
+import { InternalTransferDto } from './dto/transaction-create.dto';
+import { Account } from 'src/models/accounts/schemas/account.schema';
+import { MailService } from 'src/mail/mail.service';
+import { JwtUtil } from 'src/utils/jwt.util';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { User } from 'src/auth/schemas/user.schema';
 
 @Injectable()
 export class TransactionService {
   constructor(
     @InjectModel(Transaction.name) private transactionModel: Model<Transaction>,
+    @InjectModel(Account.name) private accountModel: Model<Account>,
+    @InjectModel(User.name) private userModel: Model<User>,
+    private mailService: MailService,
+    private JWTUtil: JwtUtil,
   ) {}
 
   async getTransactionHistory(
@@ -94,5 +109,110 @@ export class TransactionService {
         },
       ])
       .exec();
+  }
+
+  async initiateInternalTransfer(
+    accessToken: string,
+    internalTransferDto: InternalTransferDto,
+  ): Promise<Transaction> {
+    const decoded = this.JWTUtil.decodeJwt(accessToken);
+
+    if (!decoded) {
+      throw new UnauthorizedException('Invalid access token');
+    }
+
+    const fromAccount = await this.accountModel.findOne({
+      userId: decoded.sub,
+    });
+    console.log(fromAccount);
+    const { toAccount, amount, content, feeType } = internalTransferDto;
+
+    const receiverAccount = await this.accountModel.findOne({
+      accountNumber: toAccount,
+    });
+
+    if (!fromAccount || !receiverAccount) {
+      throw new NotFoundException('Account not found');
+    }
+
+    if (fromAccount.balance < amount) {
+      throw new BadRequestException('Insufficient balance');
+    }
+
+    const fee = amount / 100; // Example fee
+    const totalAmount = feeType === 'sender' ? amount + fee : amount;
+
+    if (fromAccount.balance < totalAmount) {
+      throw new BadRequestException('Insufficient balance to cover the fee');
+    }
+
+    const transaction = new this.transactionModel({
+      fromAccount,
+      toAccount,
+      amount,
+      content,
+      fee,
+      feeType,
+      status: 'pending',
+      type: 'internal_transfer',
+    });
+
+    await transaction.save();
+    const senderUser = await this.userModel.findById(fromAccount.userId);
+    console.log(senderUser);
+    // Send OTP to the sender's email
+    await this.mailService.sendOtpToVerifyTransaction(
+      senderUser.email,
+      transaction._id.toString(),
+    );
+
+    return transaction;
+  }
+
+  async verifyOtp(verifyOtpDto: VerifyOtpDto): Promise<Transaction> {
+    const { otp, transactionId } = verifyOtpDto;
+
+    const transaction = await this.transactionModel.findById(transactionId);
+    if (!transaction) {
+      throw new NotFoundException('Transaction not found');
+    }
+
+    const senderAccount = await this.accountModel.findOne({
+      accountNumber: transaction.fromAccount,
+    });
+    if (!senderAccount) {
+      throw new NotFoundException('Sender account not found');
+    }
+
+    const isValidOtp = await this.mailService.verifyOtp(
+      senderAccount.userId.email,
+      otp,
+    );
+    if (!isValidOtp) {
+      throw new UnauthorizedException('Invalid OTP');
+    }
+
+    const receiverAccount = await this.accountModel.findOne({
+      accountNumber: transaction.toAccount,
+    });
+    if (!receiverAccount) {
+      throw new NotFoundException('Receiver account not found');
+    }
+
+    if (transaction.feeType === 'sender') {
+      senderAccount.balance -= transaction.amount + transaction.fee;
+      receiverAccount.balance += transaction.amount;
+    } else {
+      senderAccount.balance -= transaction.amount;
+      receiverAccount.balance += transaction.amount - transaction.fee;
+    }
+
+    await senderAccount.save();
+    await receiverAccount.save();
+
+    transaction.status = 'completed';
+    await transaction.save();
+
+    return transaction;
   }
 }

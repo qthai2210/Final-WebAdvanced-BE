@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Account, AccountDocument } from 'src/models/accounts/schemas/account.schema';
+import {
+  Account,
+  AccountDocument,
+} from 'src/models/accounts/schemas/account.schema';
 import { Model } from 'mongoose';
 import { JwtUtil } from 'src/utils/jwt.util';
 
@@ -8,8 +11,8 @@ import { JwtUtil } from 'src/utils/jwt.util';
 export class AccountsService {
   constructor(
     @InjectModel(Account.name) private accountModel: Model<AccountDocument>,
-    private JWTUtil: JwtUtil
-  ) { }
+    private JWTUtil: JwtUtil,
+  ) {}
 
   async createOne(accessToken: string): Promise<Account> {
     try {
@@ -24,8 +27,8 @@ export class AccountsService {
       const newPaymentAccount = new this.accountModel({
         accountNumber: accountNumber,
         userId: decoded.sub,
-      })
-      return (await newPaymentAccount.save()).populate(['userId'])
+      });
+      return (await newPaymentAccount.save()).populate(['userId']);
     } catch (error) {
       throw error;
     }
