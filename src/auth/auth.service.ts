@@ -3,6 +3,8 @@ import {
   UnauthorizedException,
   ConflictException,
   BadRequestException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
@@ -14,7 +16,7 @@ import {
   RegisterDto,
   RegisterWithoutPasswordDto,
 } from './dto/auth.dto';
-
+import axios from 'axios';
 import { AuthData } from './interfaces/auth.interface';
 import { MailService } from 'src/mail/mail.service';
 import { AccountsService } from 'src/accounts/accounts.service';
@@ -76,7 +78,11 @@ export class AuthService {
     }
   }
 
-  async login(username: string, password: string): Promise<AuthData> {
+  async login(
+    username: string,
+    password: string,
+    recaptchaToken: string,
+  ): Promise<AuthData> {
     const user = await this.userModel.findOne({ username }).exec();
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -101,12 +107,43 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    await this.verifyRecaptcha(recaptchaToken);
+
     // Reset failed attempts on successful login
     user.failedLoginAttempts = 0;
     user.lastLoginAt = new Date();
     await user.save();
 
     return this.generateToken(user);
+  }
+
+  async verifyRecaptcha(token: string): Promise<void> {
+    try {
+      const response = await axios.post(
+        `https://www.google.com/recaptcha/api/siteverify`,
+        null,
+        {
+          params: {
+            secret: process.env.RECAPTCHA_SECRET_KEY,
+            response: token,
+          },
+        },
+      );
+
+      const { success } = response.data;
+      if (!success) {
+        throw new HttpException(
+          'reCAPTCHA verification failed',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+    } catch (error) {
+      console.error(error);
+      throw new HttpException(
+        'Error verifying reCAPTCHA',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   private generateToken(user: UserDocument): AuthData {
