@@ -53,6 +53,7 @@ export class AuthController {
       const result = await this.authService.login(
         loginDto.username,
         loginDto.password,
+        loginDto.recaptchaToken,
       );
       return createSuccessResponse(result);
     } catch (error) {

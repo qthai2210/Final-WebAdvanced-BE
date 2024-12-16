@@ -13,6 +13,7 @@ import { MailModule } from './mail/mail.module';
 import { UtilsModule } from './utils/utils.module';
 import { TransactionModule } from './transaction/transaction.module';
 import { AccountsModule } from './accounts/accounts.module';
+import { RecipientsModule } from './recipient/recipient.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { AccountsModule } from './accounts/accounts.module';
     UtilsModule,
     TransactionModule,
     AccountsModule,
+    RecipientsModule,
 
     // AccountsModule,
     // TransactionsModule,
@@ -61,4 +63,4 @@ import { AccountsModule } from './accounts/accounts.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

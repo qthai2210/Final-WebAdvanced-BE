@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import {
   Account,
@@ -32,5 +36,24 @@ export class AccountsService {
     } catch (error) {
       throw error;
     }
+  }
+
+  async getUserAccounts(accessToken: string): Promise<Account> {
+    const data = await this.JWTUtil.decodeJwt(accessToken);
+    if (!data) {
+      throw new UnauthorizedException('Unauthorized - User is not logged in');
+    }
+
+    const account = await this.accountModel
+      .findOne({ userId: data.sub })
+      .exec();
+
+    if (!account) {
+      throw new NotFoundException(
+        `No accounts found for user with ID ${data.sub}`,
+      );
+    }
+
+    return account;
   }
 }

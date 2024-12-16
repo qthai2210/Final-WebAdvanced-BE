@@ -20,6 +20,10 @@ export class LoginDto {
   @IsString()
   @MinLength(6)
   password: string;
+
+  @ApiProperty({ description: 'User recaptcha token' })
+  @IsString()
+  recaptchaToken: string;
 }
 
 export class RegisterDto {
