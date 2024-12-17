@@ -5,12 +5,18 @@ import {
   BadRequestException,
   HttpException,
   HttpStatus,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
-import { User, UserDocument, UserStatus } from './schemas/user.schema';
+import {
+  User,
+  UserDocument,
+  UserStatus,
+  UserRole,
+} from './schemas/user.schema';
 import {
   ChangePasswordDto,
   RegisterDto,
@@ -78,46 +84,42 @@ export class AuthService {
     }
   }
 
-  async login(
+  async loginWithRecaptcha(
     username: string,
     password: string,
     recaptchaToken: string,
   ): Promise<AuthData> {
-    const user = await this.userModel.findOne({ username }).exec();
+    // Verify recaptcha first
+    const isValidRecaptcha = await this.verifyRecaptcha(recaptchaToken);
+    if (!isValidRecaptcha) {
+      throw new UnauthorizedException('Invalid recaptcha');
+    }
+
+    // Proceed with base login
+    return this.baseLogin(username, password);
+  }
+
+  async login(username: string, password: string): Promise<AuthData> {
+    return this.baseLogin(username, password);
+  }
+
+  private async baseLogin(
+    username: string,
+    password: string,
+  ): Promise<AuthData> {
+    const user = await this.validateUser(username, password);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    if (user.isLocked()) {
-      throw new UnauthorizedException(
-        'Account is locked. Please try again later.',
-      );
-    }
-
     if (user.status === UserStatus.LOCKED) {
-      throw new UnauthorizedException(
-        'Account is permanently locked. Please contact support.',
-      );
+      throw new UnauthorizedException('Account is locked');
     }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      user.failedLoginAttempts += 1;
-      await user.save();
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    await this.verifyRecaptcha(recaptchaToken);
-
-    // Reset failed attempts on successful login
-    user.failedLoginAttempts = 0;
-    user.lastLoginAt = new Date();
-    await user.save();
 
     return this.generateToken(user);
   }
 
-  async verifyRecaptcha(token: string): Promise<void> {
+  private async verifyRecaptcha(token: string): Promise<boolean> {
     try {
       const response = await axios.post(
         `https://www.google.com/recaptcha/api/siteverify`,
@@ -130,13 +132,7 @@ export class AuthService {
         },
       );
 
-      const { success } = response.data;
-      if (!success) {
-        throw new HttpException(
-          'reCAPTCHA verification failed',
-          HttpStatus.FORBIDDEN,
-        );
-      }
+      return response.data.success;
     } catch (error) {
       console.error(error);
       throw new HttpException(
@@ -144,6 +140,23 @@ export class AuthService {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
+  }
+
+  private async validateUser(
+    username: string,
+    password: string,
+  ): Promise<UserDocument | null> {
+    const user = await this.userModel.findOne({ username }).exec();
+    if (!user) {
+      return null;
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return null;
+    }
+
+    return user;
   }
 
   private generateToken(user: UserDocument): AuthData {
@@ -463,33 +476,77 @@ export class AuthService {
   async verifyRegisterOtp(email: string, otp: string) {
     const isOtpVerified = await this.mailService.verifyOtp(email, otp);
     if (isOtpVerified) {
-      const existingUser = await this.userModel
-        .findOne({
-          $or: [{ email: email }],
-        })
-        .exec();
+      const existingUser = await this.userModel.findOne({ email }).exec();
 
-      existingUser.isLocked = () => false;
-
-      const characters =
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-      const passwordLength = 8;
-      let password = '';
-
-      for (let i = 0; i < passwordLength; i++) {
-        const randomIndex = Math.floor(Math.random() * characters.length);
-        password += characters[randomIndex];
+      if (!existingUser) {
+        throw new NotFoundException('User not found');
       }
+
+      // Update user status instead of using isLocked function
+      existingUser.status = UserStatus.ACTIVE;
+
+      // Generate random password
+      const password = this.generateRandomPassword(8);
       existingUser.password = await bcrypt.hash(password, 10);
+
       await this.mailService.sendPasswordUserAccount(email, password);
       await existingUser.save();
+
       const authData = await this.refreshToken(existingUser.refreshToken);
       const newPaymentAccount = await this.accountsService.createOne(
         authData.access_token,
       );
 
-      if (newPaymentAccount) return true;
-      else return false;
+      return !!newPaymentAccount;
     }
+    return false;
+  }
+
+  private generateRandomPassword(length: number): string {
+    const characters =
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    return Array(length)
+      .fill(null)
+      .map(() =>
+        characters.charAt(Math.floor(Math.random() * characters.length)),
+      )
+      .join('');
+  }
+
+  async createEmployee(employeeData: any): Promise<UserDocument> {
+    const hashedPassword = await bcrypt.hash(employeeData.password, 10);
+    const employee = await this.userModel.create({
+      ...employeeData,
+      password: hashedPassword,
+      role: UserRole.EMPLOYEE,
+    });
+    return employee;
+  }
+
+  async findAllEmployees(): Promise<UserDocument[]> {
+    return this.userModel.find({ role: UserRole.EMPLOYEE }).exec();
+  }
+
+  async findEmployeeById(id: string): Promise<UserDocument> {
+    return this.userModel.findOne({ _id: id, role: UserRole.EMPLOYEE }).exec();
+  }
+
+  async updateEmployee(id: string, updateData: any): Promise<UserDocument> {
+    if (updateData.password) {
+      updateData.password = await bcrypt.hash(updateData.password, 10);
+    }
+    return this.userModel
+      .findOneAndUpdate(
+        { _id: id, role: UserRole.EMPLOYEE },
+        { $set: updateData },
+        { new: true },
+      )
+      .exec();
+  }
+
+  async deleteEmployee(id: string): Promise<UserDocument> {
+    return this.userModel
+      .findOneAndDelete({ _id: id, role: UserRole.EMPLOYEE })
+      .exec();
   }
 }
