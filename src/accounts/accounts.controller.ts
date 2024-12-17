@@ -1,4 +1,4 @@
-import { Controller, Get, Post } from '@nestjs/common';
+import { Controller, Get, Param, Post } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -44,5 +44,29 @@ export class AccountsController {
   })
   async getUserAccounts(@BearerToken() accessToken: string) {
     return await this.accountsService.getUserAccounts(accessToken);
+  }
+
+  @Get(':accountNumber')
+  @ApiOperation({ summary: 'Get account details by account number' })
+  @ApiResponse({
+    status: 200,
+    description: 'Account details retrieved successfully',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - User is not logged in',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Not Found - Account not found',
+  })
+  async getAccountByAccountNumber(
+    @BearerToken() accessToken: string,
+    @Param('accountNumber') accountNumber: string,
+  ) {
+    return this.accountsService.getAccountByAccountNumber(
+      accessToken,
+      accountNumber,
+    );
   }
 }

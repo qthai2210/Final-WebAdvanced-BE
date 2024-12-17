@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, Param, Patch } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Param,
+  Patch,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -11,10 +19,16 @@ import { BearerToken } from 'src/auth/decorators/auth.decorator';
 import { DebtSummaryDto } from './dto/debt.dto';
 import { CancelDebtDto } from './dto/cancel-debt.dto';
 import { PayDebtDto, SendPaymentOtpDto } from './dto/debt.dto';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { UserRole } from 'src/auth/schemas/user.schema';
 
 @ApiTags('Debts')
 @Controller('debts')
-@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.CUSTOMER)
+@ApiBearerAuth('access-token')
 export class DebtController {
   constructor(private readonly debtService: DebtService) {}
 
