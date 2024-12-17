@@ -11,11 +11,21 @@ async function bootstrap() {
 
   // Swagger configuration
   const config = new DocumentBuilder()
-    .setTitle('Authentication API')
-    .setDescription('The authentication API description')
+    .setTitle('Banking API')
+    .setDescription('Banking System API Documentation')
     .setVersion('1.0')
     .addTag('auth')
-    .addBearerAuth()
+    .addBearerAuth(
+      {
+        description: 'Please enter token in following format: Bearer <JWT>',
+        name: 'Authorization',
+        bearerFormat: 'Bearer',
+        scheme: 'Bearer',
+        type: 'http',
+        in: 'Header',
+      },
+      'access-token', // This name here is important for references
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

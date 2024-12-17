@@ -26,6 +26,25 @@ export class LoginDto {
   recaptchaToken: string;
 }
 
+export class BaseLoginDto {
+  @ApiProperty({ example: 'johndoe', description: 'Username for login' })
+  @IsString()
+  @IsNotEmpty()
+  username: string;
+
+  @ApiProperty({ example: 'password123', description: 'User password' })
+  @IsString()
+  @IsNotEmpty()
+  password: string;
+}
+
+export class LoginWithRecaptchaDto extends BaseLoginDto {
+  @ApiProperty({ description: 'User recaptcha token' })
+  @IsString()
+  @IsNotEmpty()
+  recaptchaToken: string;
+}
+
 export class RegisterDto {
   @ApiProperty({ example: 'johndoe', description: 'Unique username' })
   @IsString()

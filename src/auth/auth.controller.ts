@@ -15,9 +15,11 @@ import {
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import {
+  BaseLoginDto,
   ChangePasswordDto,
   ForgotPasswordDto,
   LoginDto,
+  LoginWithRecaptchaDto,
   RegisterDto,
   RegisterWithoutPasswordDto,
   ResetPasswordDto,
@@ -42,18 +44,41 @@ export class AuthController {
     private readonly mailService: MailService,
   ) {}
 
-  @Post('login')
-  @ApiOperation({ summary: 'User login' })
+  @Post('login/secure')
+  @ApiOperation({ summary: 'User login with recaptcha' })
   @SwaggerResponse({
     status: 200,
     description: 'Login successful',
   })
-  async login(@Body() loginDto: LoginDto): Promise<ApiResponse<AuthData>> {
+  async loginWithRecaptcha(
+    @Body() loginDto: LoginWithRecaptchaDto,
+  ): Promise<ApiResponse<AuthData>> {
+    try {
+      const result = await this.authService.loginWithRecaptcha(
+        loginDto.username,
+        loginDto.password,
+        loginDto.recaptchaToken,
+      );
+      return createSuccessResponse(result);
+    } catch (error) {
+      return createErrorResponse(
+        error.status || HttpStatus.UNAUTHORIZED,
+        error.message || 'Authentication failed',
+      );
+    }
+  }
+
+  @Post('login')
+  @ApiOperation({ summary: 'User login without recaptcha' })
+  @SwaggerResponse({
+    status: 200,
+    description: 'Login successful',
+  })
+  async login(@Body() loginDto: BaseLoginDto): Promise<ApiResponse<AuthData>> {
     try {
       const result = await this.authService.login(
         loginDto.username,
         loginDto.password,
-        loginDto.recaptchaToken,
       );
       return createSuccessResponse(result);
     } catch (error) {

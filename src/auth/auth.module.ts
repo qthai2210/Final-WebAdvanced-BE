@@ -9,6 +9,7 @@ import { User, UserSchema } from './schemas/user.schema';
 import { ConfigService } from '@nestjs/config';
 import { MailModule } from 'src/mail/mail.module';
 import { AccountsModule } from 'src/accounts/accounts.module';
+import { AdminEmployeeController } from './admin/admin-employee.controller';
 
 @Module({
   imports: [
@@ -25,7 +26,7 @@ import { AccountsModule } from 'src/accounts/accounts.module';
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
   ],
   providers: [AuthService, JwtStrategy],
-  controllers: [AuthController],
+  controllers: [AuthController, AdminEmployeeController],
   exports: [AuthService],
 })
-export class AuthModule { }
+export class AuthModule {}
