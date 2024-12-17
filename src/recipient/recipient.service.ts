@@ -35,6 +35,7 @@ export class RecipientService {
     accessToken: string,
     recipientDto: RecipientDto,
   ): Promise<Recipient> {
+    console.log(accessToken);
     const data = await this.jwtUtil.decodeJwt(accessToken);
     if (!data) {
       throw new UnauthorizedException('Unauthorized - User is not logged in');

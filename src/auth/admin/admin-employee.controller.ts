@@ -13,7 +13,7 @@ import {
   ApiBearerAuth,
   ApiTags,
   ApiOperation,
-  ApiHeader,
+  //ApiHeader,
   ApiResponse,
 } from '@nestjs/swagger';
 import { AuthService } from '../auth.service';
@@ -66,6 +66,7 @@ export class AdminEmployeeController {
   @ApiResponse({ status: 403, description: 'Forbidden - Requires Admin Role.' })
   async getAllEmployees() {
     console.log('get all employees');
+    // log access token
     return this.authService.findAllEmployees();
   }
 

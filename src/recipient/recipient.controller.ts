@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  UseGuards,
 } from '@nestjs/common';
 import { RecipientService } from './recipient.service';
 import { BearerToken } from 'src/auth/decorators/auth.decorator';
@@ -16,10 +17,16 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { RecipientDto } from './recipient.dto';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { UserRole } from 'src/auth/schemas/user.schema';
 
-@ApiTags('Recipients')
-@ApiBearerAuth()
 @Controller('recipients')
+@ApiTags('Recipients')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.CUSTOMER)
+@ApiBearerAuth('access-token') // Must match the name in main.ts
 export class RecipientController {
   constructor(private readonly recipientService: RecipientService) {}
 
@@ -45,6 +52,8 @@ export class RecipientController {
     @BearerToken() accessToken: string,
     @Body() recipientDto: RecipientDto,
   ) {
+    // log the access token
+    console.log(accessToken);
     return this.recipientService.addRecipient(accessToken, recipientDto);
   }
 

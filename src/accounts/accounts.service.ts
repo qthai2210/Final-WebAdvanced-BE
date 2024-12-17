@@ -56,4 +56,19 @@ export class AccountsService {
 
     return account;
   }
+
+  async getAccountByAccountNumber(
+    accessToken: string,
+    accountNumber: string,
+  ): Promise<Account> {
+    const account = await this.accountModel
+      .findOne({ accountNumber: accountNumber })
+      .exec();
+
+    if (!account) {
+      throw new NotFoundException('Account not found');
+    }
+
+    return account;
+  }
 }

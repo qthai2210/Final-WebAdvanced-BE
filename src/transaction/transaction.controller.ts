@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { TransactionService } from './transaction.service';
 import {
   TransactionHistoryQueryDto,
@@ -13,9 +13,15 @@ import {
 import { InternalTransferDto } from './dto/transaction-create.dto';
 import { BearerToken } from 'src/auth/decorators/auth.decorator';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { UserRole } from 'src/auth/schemas/user.schema';
 
 @ApiTags('transactions')
-@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.CUSTOMER)
+@ApiBearerAuth('access-token')
 @Controller('transactions')
 export class TransactionController {
   constructor(private readonly transactionService: TransactionService) {}
