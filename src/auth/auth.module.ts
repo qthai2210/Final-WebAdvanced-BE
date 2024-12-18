@@ -10,6 +10,8 @@ import { ConfigService } from '@nestjs/config';
 import { MailModule } from 'src/mail/mail.module';
 import { AccountsModule } from 'src/accounts/accounts.module';
 import { AdminEmployeeController } from './admin/admin-employee.controller';
+import { LoggingModule } from '../logging/logging.module';
+import { LoggingInterceptor } from '../logging/logging.interceptor';
 
 @Module({
   imports: [
@@ -24,8 +26,16 @@ import { AdminEmployeeController } from './admin/admin-employee.controller';
       inject: [ConfigService],
     }),
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+    LoggingModule,
   ],
-  providers: [AuthService, JwtStrategy],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    {
+      provide: 'LOGGING_INTERCEPTOR',
+      useClass: LoggingInterceptor,
+    },
+  ],
   controllers: [AuthController, AdminEmployeeController],
   exports: [AuthService],
 })

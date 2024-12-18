@@ -14,6 +14,7 @@ import { UtilsModule } from './utils/utils.module';
 import { TransactionModule } from './transaction/transaction.module';
 import { AccountsModule } from './accounts/accounts.module';
 import { RecipientsModule } from './recipient/recipient.module';
+import { LoggingModule } from './logging/logging.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { RecipientsModule } from './recipient/recipient.module';
     TransactionModule,
     AccountsModule,
     RecipientsModule,
+    LoggingModule,
 
     // AccountsModule,
     // TransactionsModule,

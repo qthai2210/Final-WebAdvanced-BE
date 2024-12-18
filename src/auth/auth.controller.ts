@@ -6,6 +6,7 @@ import {
   //UseGuards,
   //Request,
   //HttpCode,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -34,6 +35,7 @@ import {
 import { AuthData } from './interfaces/auth.interface';
 import { BearerToken } from './decorators/auth.decorator';
 import { MailService } from '../mail/mail.service';
+import { LoggingService } from '../logging/logging.service';
 
 @ApiTags('Authentication')
 @ApiBearerAuth()
@@ -42,6 +44,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly mailService: MailService,
+    private readonly loggingService: LoggingService,
   ) {}
 
   @Post('login/secure')
