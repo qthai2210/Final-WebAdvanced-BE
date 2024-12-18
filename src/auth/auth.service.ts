@@ -175,7 +175,7 @@ export class AuthService {
 
     return {
       access_token: this.jwtService.sign(accessTokenPayload, {
-        expiresIn: '15m',
+        expiresIn: '120m',
       }),
       refresh_token: this.jwtService.sign(refreshTokenPayload, {
         expiresIn: '7d',

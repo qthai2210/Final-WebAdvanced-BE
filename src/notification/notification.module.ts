@@ -10,6 +10,7 @@ import {
 import { AuthModule } from '../auth/auth.module'; // Add this
 import { UserSchema } from 'src/auth/schemas/user.schema';
 import { NotificationGateway } from './notification.gateway';
+import { NotificationController } from './notification.controller';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { NotificationGateway } from './notification.gateway';
     },
     NotificationService,
   ],
+  controllers: [NotificationController],
   exports: [NotificationService],
 })
 export class NotificationModule {}

@@ -21,7 +21,7 @@ import { LoggingInterceptor } from '../logging/logging.interceptor';
     JwtModule.registerAsync({
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '15m' },
+        signOptions: { expiresIn: '120m' },
       }),
       inject: [ConfigService],
     }),
