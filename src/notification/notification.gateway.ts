@@ -29,6 +29,7 @@ export class NotificationGateway
 
   handleConnection(client: Socket) {
     const userId = client.handshake.query.userId as string;
+    console.log(client.handshake);
     if (userId) {
       this.userSockets.set(userId, client.id);
       console.log(`Client connected: ${userId}`);
@@ -52,11 +53,36 @@ export class NotificationGateway
   sendNotificationToUser(userId: string, notification: any) {
     const socketId = this.userSockets.get(userId);
     if (socketId) {
-      this.server.to(socketId).emit('newNotification', notification);
+      this.server.to(socketId).emit('newNotification', {
+        ...notification,
+        isRead: false,
+      });
     }
   }
 
   isUserOnline(userId: string): boolean {
     return this.userSockets.has(userId);
+  }
+
+  broadcastNotificationUpdate(
+    userId: string,
+    notificationId: string,
+    isRead: boolean,
+  ) {
+    try {
+      const socketId = this.userSockets.get(userId);
+      if (socketId) {
+        this.server.to(socketId).emit('notificationUpdate', {
+          id: notificationId,
+          isRead,
+          updatedAt: new Date().toISOString(),
+        });
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to broadcast notification update:', error);
+      return false;
+    }
   }
 }

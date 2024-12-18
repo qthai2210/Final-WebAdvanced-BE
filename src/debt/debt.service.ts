@@ -58,6 +58,10 @@ export class DebtService {
   ): Promise<Debt> {
     const user = this.decodeToken(accessToken);
 
+    if (user.sub === createDebtDto.accountNumber) {
+      throw new BadRequestException('Cannot create debt to oneself');
+    }
+
     const account = await this.accountModel.findOne({
       accountNumber: createDebtDto.accountNumber,
     });
@@ -74,13 +78,21 @@ export class DebtService {
 
     const newDebt = new this.debtModel({
       fromUserId: user.sub,
-      toUserId: toUserId,
+      toUserId: toUserId._id,
       amount: createDebtDto.amount,
       content: createDebtDto.content,
       status: 'pending',
     });
-    //console.log(newDebt);
+
     const savedDebt = await newDebt.save();
+
+    await this.notificationService.createNotification({
+      userId: toUserId._id.toString(),
+      content: `You have a new debt of ${createDebtDto.amount} from ${user.sub}`,
+      type: 'DEBT_CREATED',
+      relatedId: savedDebt._id.toString(),
+    });
+
     return (await savedDebt.populate('fromUserId', '_id fullName')).populate(
       'toUserId',
       '_id fullName',
