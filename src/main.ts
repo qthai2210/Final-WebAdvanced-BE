@@ -2,12 +2,18 @@ import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { LoggingInterceptor } from './logging/logging.interceptor';
+import { LoggingService } from './logging/logging.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Validation pipe
   app.useGlobalPipes(new ValidationPipe());
+
+  // Apply Logging Interceptor globally
+  const loggingService = app.get(LoggingService);
+  app.useGlobalInterceptors(new LoggingInterceptor(loggingService));
 
   // Swagger configuration
   const config = new DocumentBuilder()
