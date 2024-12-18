@@ -12,7 +12,7 @@ import {
 } from '@nestjs/swagger';
 import { InternalTransferDto } from './dto/transaction-create.dto';
 import { BearerToken } from 'src/auth/decorators/auth.decorator';
-import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { VerifyOtpTransactionDto } from './dto/verify-otp.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
 import { Roles } from 'src/auth/decorators/roles.decorator';
@@ -69,7 +69,7 @@ export class TransactionController {
     status: 200,
     description: 'OTP verified and transaction completed',
   })
-  async verifyOtp(@Body() verifyOtpDto: VerifyOtpDto) {
+  async verifyOtp(@Body() verifyOtpDto: VerifyOtpTransactionDto) {
     return this.transactionService.verifyOtp(verifyOtpDto);
   }
 }

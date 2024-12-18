@@ -15,7 +15,7 @@ import { InternalTransferDto } from './dto/transaction-create.dto';
 import { Account } from 'src/models/accounts/schemas/account.schema';
 import { MailService } from 'src/mail/mail.service';
 import { JwtUtil } from 'src/utils/jwt.util';
-import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { VerifyOtpTransactionDto } from './dto/verify-otp.dto';
 import { User } from 'src/auth/schemas/user.schema';
 
 @Injectable()
@@ -169,7 +169,7 @@ export class TransactionService {
     return transaction;
   }
 
-  async verifyOtp(verifyOtpDto: VerifyOtpDto): Promise<Transaction> {
+  async verifyOtp(verifyOtpDto: VerifyOtpTransactionDto): Promise<Transaction> {
     const { otp, transactionId } = verifyOtpDto;
 
     const transaction = await this.transactionModel.findById(transactionId);
