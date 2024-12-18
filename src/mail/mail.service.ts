@@ -122,4 +122,21 @@ export class MailService {
       `,
     });
   }
+
+  async verifyOtpTransaction(
+    transactionId: string,
+    otp: string,
+  ): Promise<boolean> {
+    const transaction = await this.transactionModel.findOne({
+      _id: transactionId,
+      otp,
+      otpExpired: { $gt: new Date() },
+    });
+
+    if (!transaction) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    return true;
+  }
 }
