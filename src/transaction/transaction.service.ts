@@ -15,7 +15,7 @@ import { InternalTransferDto } from './dto/transaction-create.dto';
 import { Account } from 'src/models/accounts/schemas/account.schema';
 import { MailService } from 'src/mail/mail.service';
 import { JwtUtil } from 'src/utils/jwt.util';
-import { VerifyOtpDto } from './dto/verify-otp.dto';
+import { VerifyOtpTransactionDto } from './dto/verify-otp.dto';
 import { User } from 'src/auth/schemas/user.schema';
 
 @Injectable()
@@ -147,12 +147,12 @@ export class TransactionService {
     }
 
     const transaction = new this.transactionModel({
-      fromAccount,
-      toAccount,
-      amount,
-      content,
-      fee,
-      feeType,
+      fromAccount: fromAccount.accountNumber.toString(),
+      toAccount: toAccount,
+      amount: amount,
+      content: content,
+      fee: fee,
+      feeType: feeType,
       status: 'pending',
       type: 'internal_transfer',
     });
@@ -169,7 +169,7 @@ export class TransactionService {
     return transaction;
   }
 
-  async verifyOtp(verifyOtpDto: VerifyOtpDto): Promise<Transaction> {
+  async verifyOtp(verifyOtpDto: VerifyOtpTransactionDto): Promise<Transaction> {
     const { otp, transactionId } = verifyOtpDto;
 
     const transaction = await this.transactionModel.findById(transactionId);
@@ -177,6 +177,7 @@ export class TransactionService {
       throw new NotFoundException('Transaction not found');
     }
 
+    console.log(transaction);
     const senderAccount = await this.accountModel.findOne({
       accountNumber: transaction.fromAccount,
     });
@@ -184,8 +185,8 @@ export class TransactionService {
       throw new NotFoundException('Sender account not found');
     }
 
-    const isValidOtp = await this.mailService.verifyOtp(
-      senderAccount.userId.email,
+    const isValidOtp = await this.mailService.verifyOtpTransaction(
+      transactionId,
       otp,
     );
     if (!isValidOtp) {

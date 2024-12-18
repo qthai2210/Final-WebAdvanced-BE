@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Post } from '@nestjs/common';
+import { Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -7,10 +7,16 @@ import {
 } from '@nestjs/swagger';
 import { AccountsService } from './accounts.service';
 import { BearerToken } from 'src/auth/decorators/auth.decorator';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { UserRole } from 'src/auth/schemas/user.schema';
 
 @ApiTags('Accounts')
 @Controller('accounts')
-@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.CUSTOMER)
+@ApiBearerAuth('access-token')
 export class AccountsController {
   constructor(private readonly accountsService: AccountsService) {}
 
@@ -43,6 +49,7 @@ export class AccountsController {
     description: 'Not Found - No accounts found for the current user',
   })
   async getUserAccounts(@BearerToken() accessToken: string) {
+    console.log(accessToken);
     return await this.accountsService.getUserAccounts(accessToken);
   }
 
