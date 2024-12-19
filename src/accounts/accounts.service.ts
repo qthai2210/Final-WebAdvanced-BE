@@ -10,11 +10,15 @@ import {
 } from 'src/models/accounts/schemas/account.schema';
 import { Model } from 'mongoose';
 import { JwtUtil } from 'src/utils/jwt.util';
+import { Recipient } from 'src/models/recipients/schemas/recipient.schema';
+import { User } from 'src/auth/schemas/user.schema';
 
 @Injectable()
 export class AccountsService {
   constructor(
     @InjectModel(Account.name) private accountModel: Model<AccountDocument>,
+    @InjectModel(Recipient.name) private recipientModel: Model<Recipient>,
+    @InjectModel(User.name) private userModel: Model<User>,
     private JWTUtil: JwtUtil,
   ) {}
 
@@ -60,7 +64,12 @@ export class AccountsService {
   async getAccountByAccountNumber(
     accessToken: string,
     accountNumber: string,
-  ): Promise<Account> {
+  ): Promise<any> {
+    const data = await this.JWTUtil.decodeJwt(accessToken);
+    if (!data) {
+      throw new UnauthorizedException('Unauthorized - User is not logged in');
+    }
+
     const account = await this.accountModel
       .findOne({ accountNumber: accountNumber })
       .exec();
@@ -69,6 +78,22 @@ export class AccountsService {
       throw new NotFoundException('Account not found');
     }
 
-    return account;
+    const recipient = await this.recipientModel.findOne({
+      accountNumber: accountNumber,
+      userId: data.sub,
+    });
+
+    if (recipient) {
+      return {
+        accountNumber: account.accountNumber,
+        nickname: recipient.nickname,
+      };
+    } else {
+      const user = await this.userModel.findById(account.userId);
+      return {
+        accountNumber: account.accountNumber,
+        nickname: user.username,
+      };
+    }
   }
 }
