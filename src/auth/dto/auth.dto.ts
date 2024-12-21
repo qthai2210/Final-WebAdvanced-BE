@@ -11,21 +11,6 @@ import {
 } from 'class-validator';
 import { UserRole } from '../schemas/user.schema';
 
-export class LoginDto {
-  @ApiProperty({ example: 'johndoe', description: 'Username for login' })
-  @IsString()
-  username: string;
-
-  @ApiProperty({ example: 'password123', description: 'User password' })
-  @IsString()
-  @MinLength(6)
-  password: string;
-
-  @ApiProperty({ description: 'User recaptcha token' })
-  @IsString()
-  recaptchaToken: string;
-}
-
 export class BaseLoginDto {
   @ApiProperty({ example: 'johndoe', description: 'Username for login' })
   @IsString()
