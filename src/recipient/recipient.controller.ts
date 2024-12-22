@@ -94,7 +94,7 @@ export class RecipientController {
     return this.recipientService.updateRecipient(accessToken, recipientDto);
   }
 
-  @Delete(':accountNumber')
+  @Delete(':recipientId')
   @ApiOperation({ summary: 'Delete a recipient' })
   @ApiResponse({
     status: 200,
@@ -110,8 +110,8 @@ export class RecipientController {
   })
   async removeRecipient(
     @BearerToken() accessToken: string,
-    @Param('accountNumber') accountNumber: string,
+    @Param('recipientId') recipientId: string,
   ) {
-    return this.recipientService.removeRecipient(accessToken, accountNumber);
+    return this.recipientService.removeRecipient(accessToken, recipientId);
   }
 }

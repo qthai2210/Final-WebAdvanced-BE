@@ -103,7 +103,7 @@ export class RecipientService {
 
   async removeRecipient(
     accessToken: string,
-    accountNumber: string,
+    recipientId: string,
   ): Promise<Recipient> {
     const data = await this.jwtUtil.decodeJwt(accessToken);
     if (!data) {
@@ -111,11 +111,10 @@ export class RecipientService {
     }
 
     const recipient = await this.recipientModel.findOne({
-      userId: data.sub,
-      accountNumber,
+      _id: recipientId,
     });
     const result = await this.recipientModel
-      .deleteOne({ userId: data.sub, accountNumber })
+      .deleteOne({ _id: recipientId })
       .exec();
 
     if (result.deletedCount === 0) {
