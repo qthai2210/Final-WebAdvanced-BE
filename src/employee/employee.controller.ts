@@ -28,7 +28,7 @@ import {
 export class EmployeeController {
   constructor(private readonly employeeService: EmployeeService) { }
 
-  @Get('history')
+  @Get('user-transaction-history')
   @ApiOperation({
     summary: 'Get transaction history',
     description: 'Get transaction history for a specific account with filters',
