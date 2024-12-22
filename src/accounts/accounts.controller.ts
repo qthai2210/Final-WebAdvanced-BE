@@ -53,7 +53,6 @@ export class AccountsController {
     return await this.accountsService.getUserAccounts(accessToken);
   }
 
-  @Roles(UserRole.EMPLOYEE, UserRole.CUSTOMER)
   @Get(':accountNumber')
   @ApiOperation({ summary: 'Get account details by account number' })
   @ApiResponse({

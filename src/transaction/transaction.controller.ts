@@ -26,7 +26,6 @@ import { UserRole } from 'src/auth/schemas/user.schema';
 export class TransactionController {
   constructor(private readonly transactionService: TransactionService) { }
 
-  @Roles(UserRole.CUSTOMER, UserRole.EMPLOYEE)
   @Get('history')
   @ApiOperation({
     summary: 'Get transaction history',
