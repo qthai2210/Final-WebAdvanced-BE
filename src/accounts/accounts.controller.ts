@@ -18,7 +18,7 @@ import { UserRole } from 'src/auth/schemas/user.schema';
 @Roles(UserRole.CUSTOMER)
 @ApiBearerAuth('access-token')
 export class AccountsController {
-  constructor(private readonly accountsService: AccountsService) {}
+  constructor(private readonly accountsService: AccountsService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create a new payment account' })
@@ -53,6 +53,7 @@ export class AccountsController {
     return await this.accountsService.getUserAccounts(accessToken);
   }
 
+  @Roles(UserRole.EMPLOYEE, UserRole.CUSTOMER)
   @Get(':accountNumber')
   @ApiOperation({ summary: 'Get account details by account number' })
   @ApiResponse({
