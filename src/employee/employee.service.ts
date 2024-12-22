@@ -1,18 +1,21 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Transaction } from 'src/models/transactions/schemas/transaction.schema';
 import { TransactionHistoryQueryDto } from 'src/transaction/dto/transaction-history.dto';
+import { DepositMoneyCreateDto } from './dto/deposit-money-create.dto';
+import { Account } from 'src/models/accounts/schemas/account.schema';
+import { AccountsService } from 'src/accounts/accounts.service';
 
 @Injectable()
 export class EmployeeService {
   constructor(
     @InjectModel(Transaction.name) private transactionModel: Model<Transaction>,
+    @InjectModel(Account.name) private accountModel: Model<Account>,
+    private readonly accountsService: AccountsService,
   ) { }
 
-  async getTransactionHistory(
-    query: TransactionHistoryQueryDto,
-  ): Promise<any> {
+  async getTransactionHistory(query: TransactionHistoryQueryDto): Promise<any> {
     const {
       accountNumber,
       type = 'all',
@@ -31,7 +34,8 @@ export class EmployeeService {
       $or: [{ fromAccount: accountNumber }, { toAccount: accountNumber }],
     };
 
-    const totalDocuments = await this.transactionModel.countDocuments(matchQuery);
+    const totalDocuments =
+      await this.transactionModel.countDocuments(matchQuery);
     const totalPages = Math.ceil(totalDocuments / limitNum);
 
     if (type !== 'all') {
@@ -140,9 +144,27 @@ export class EmployeeService {
           },
         },
       ])
-      .exec()
+      .exec();
     return {
-      transaction, totalPages
+      transaction,
+      totalPages,
     };
+  }
+
+  async depositMoneyIntoCustomerAccount(
+    data: DepositMoneyCreateDto,
+  ): Promise<any> {
+    const userAccount = await this.accountsService.getAccountDetail(
+      data.accountNumber,
+      data.username,
+    );
+
+    if (userAccount) {
+      userAccount.balance += data.amount;
+      await userAccount.save();
+      return true;
+    } else {
+      throw new NotFoundException('Account not found');
+    }
   }
 }

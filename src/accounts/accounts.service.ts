@@ -20,7 +20,7 @@ export class AccountsService {
     @InjectModel(Recipient.name) private recipientModel: Model<Recipient>,
     @InjectModel(User.name) private userModel: Model<User>,
     private JWTUtil: JwtUtil,
-  ) {}
+  ) { }
 
   async createOne(accessToken: string): Promise<Account> {
     try {
@@ -95,5 +95,28 @@ export class AccountsService {
         nickname: user.username,
       };
     }
+  }
+
+  async getAccountDetail(
+    accountNumber?: string,
+    username?: string,
+  ): Promise<any> {
+    let account: any;
+
+    if (accountNumber) {
+      account = await this.accountModel
+        .findOne({ accountNumber: accountNumber })
+        .exec();
+    } else {
+      const user = await this.userModel.findOne({ username: username }).exec();
+
+      account = await this.accountModel.findOne({ userId: user.id }).exec();
+    }
+
+    if (!account) {
+      throw new NotFoundException('Account not found');
+    }
+
+    return account;
   }
 }
