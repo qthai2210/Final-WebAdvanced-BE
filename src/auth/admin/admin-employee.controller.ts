@@ -8,6 +8,8 @@ import {
   Delete,
   UseGuards,
   Headers,
+  Query,
+  NotFoundException,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -15,6 +17,8 @@ import {
   ApiOperation,
   //ApiHeader,
   ApiResponse,
+  ApiParam,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { AuthService } from '../auth.service';
 import { UserRole, UserStatus } from '../schemas/user.schema';
@@ -22,11 +26,14 @@ import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { RolesGuard } from '../guards/roles.guard';
 import { Roles } from '../decorators/roles.decorator';
 import { CreateEmployeeDto } from '../dto/create-employee.dto';
+import { PaginationDto } from '../dto/pagination.dto';
+import { createSuccessResponse } from 'src/ApiRespose/interface/response.interface';
+import { EmployeeFilterDto } from '../dto/employee-filter.dto';
 
+@ApiTags('Admin - Employees')
 @Controller('admin/employees')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
-@ApiTags('Employee Management')
 @ApiBearerAuth('access-token') // Must match the name in main.ts
 // @ApiHeader({
 //   name: 'Authorization',
@@ -60,19 +67,51 @@ export class AdminEmployeeController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all employees' })
-  @ApiResponse({ status: 200, description: 'List of all employees.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Requires Admin Role.' })
-  async getAllEmployees() {
-    console.log('get all employees');
-    // log access token
-    return this.authService.findAllEmployees();
+  @ApiOperation({ summary: 'Get all employees with pagination and filters' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns filtered and paginated list of employees',
+  })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'status', required: false, enum: UserStatus })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    enum: ['createdAt', 'username', 'email', 'fullName'],
+  })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
+  async findAll(@Query() filterDto: EmployeeFilterDto) {
+    const result = await this.authService.findAllEmployees(filterDto);
+    return createSuccessResponse(result);
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get employee by ID' })
+  @ApiParam({ name: 'id', description: 'Employee ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Employee found successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Employee not found',
+  })
   async getEmployee(@Param('id') id: string) {
-    return this.authService.findEmployeeById(id);
+    const employee = await this.authService.findEmployeeById(id);
+    if (!employee) {
+      throw new NotFoundException(`Employee with ID ${id} not found`);
+    }
+    return {
+      success: true,
+      data: {
+        id: employee._id,
+        username: employee.username,
+        email: employee.email,
+        fullName: employee.fullName,
+        phone: employee.phone,
+        status: employee.status,
+      },
+    };
   }
 
   @Put(':id')
