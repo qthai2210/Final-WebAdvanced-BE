@@ -26,6 +26,8 @@ import axios from 'axios';
 import { AuthData } from './interfaces/auth.interface';
 import { MailService } from 'src/mail/mail.service';
 import { AccountsService } from 'src/accounts/accounts.service';
+import { PaginationDto, PaginatedResponse } from './dto/pagination.dto';
+import { EmployeeFilterDto } from './dto/employee-filter.dto';
 
 @Injectable()
 export class AuthService {
@@ -523,8 +525,69 @@ export class AuthService {
     return employee;
   }
 
-  async findAllEmployees(): Promise<UserDocument[]> {
-    return this.userModel.find({ role: UserRole.EMPLOYEE }).exec();
+  async findAllEmployees(
+    filterDto: EmployeeFilterDto,
+  ): Promise<PaginatedResponse<UserDocument>> {
+    const {
+      page = 1,
+      limit = 10,
+      search,
+      status,
+      sortBy,
+      sortOrder,
+    } = filterDto;
+    const skip = (page - 1) * limit;
+
+    // Build filter query
+    const filter: any = { role: UserRole.EMPLOYEE };
+
+    if (status) {
+      filter.status = status;
+    }
+
+    if (search) {
+      filter.$or = [
+        { username: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { fullName: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    // Build sort query
+    const sort: any = {};
+    if (sortBy) {
+      sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    } else {
+      sort.createdAt = -1; // Default sort
+    }
+
+    const [employees, total] = await Promise.all([
+      this.userModel
+        .find(filter)
+        .select(
+          '-password -resetPasswordOTP -resetPasswordOTPExpires -refreshToken',
+        )
+        .skip(skip)
+        .limit(limit)
+        .sort(sort)
+        .exec(),
+      this.userModel.countDocuments(filter),
+    ]);
+
+    if (!employees.length && page > 1 && total > 0) {
+      throw new NotFoundException(`No employees found on page ${page}`);
+    }
+
+    return {
+      data: employees,
+      metadata: {
+        total,
+        page,
+        lastPage: Math.ceil(total / limit),
+        limit,
+      },
+    };
   }
 
   async findEmployeeById(id: string): Promise<UserDocument> {

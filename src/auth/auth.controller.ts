@@ -56,6 +56,7 @@ export class AuthController {
   async loginWithRecaptcha(
     @Body() loginDto: LoginWithRecaptchaDto,
   ): Promise<ApiResponse<AuthData>> {
+    console.log('loginDto', loginDto);
     try {
       const result = await this.authService.loginWithRecaptcha(
         loginDto.username,
