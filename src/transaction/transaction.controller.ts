@@ -24,7 +24,7 @@ import { UserRole } from 'src/auth/schemas/user.schema';
 @ApiBearerAuth('access-token')
 @Controller('transactions')
 export class TransactionController {
-  constructor(private readonly transactionService: TransactionService) {}
+  constructor(private readonly transactionService: TransactionService) { }
 
   @Get('history')
   @ApiOperation({
