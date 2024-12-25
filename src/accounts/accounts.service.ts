@@ -20,7 +20,7 @@ export class AccountsService {
     @InjectModel(Recipient.name) private recipientModel: Model<Recipient>,
     @InjectModel(User.name) private userModel: Model<User>,
     private JWTUtil: JwtUtil,
-  ) { }
+  ) {}
 
   async createOne(accessToken: string): Promise<Account> {
     try {
