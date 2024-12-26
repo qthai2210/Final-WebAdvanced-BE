@@ -229,19 +229,24 @@ export class AuthController {
   async changePassword(
     @BearerToken() accessToken: string,
     @Body() changePasswordDto: ChangePasswordDto,
-  ): Promise<ApiResponse<{ message: string }>> {
-    try {
-      console.log('accessToken', accessToken);
-      await this.authService.changePassword(accessToken, changePasswordDto);
-      return createSuccessResponse({
-        message: 'Password changed successfully',
-      });
-    } catch (error) {
-      return createErrorResponse(
-        error.status || HttpStatus.BAD_REQUEST,
-        error.message || 'Failed to change password',
-      );
-    }
+  ) {
+    // try {
+    //   console.log('accessToken', accessToken);
+    //   await this.authService.changePassword(accessToken, changePasswordDto);
+    //   return createSuccessResponse({
+    //     message: 'Password changed successfully',
+    //   });
+    // } catch (error) {
+    //   return createErrorResponse(
+    //     error.status || HttpStatus.BAD_REQUEST,
+    //     error.message || 'Failed to change password',
+    //   );
+    // }
+
+    return await this.authService.changePassword(
+      accessToken,
+      changePasswordDto,
+    );
   }
 
   @Post('register-with-otp')
