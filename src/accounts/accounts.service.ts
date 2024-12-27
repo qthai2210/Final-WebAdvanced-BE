@@ -87,12 +87,14 @@ export class AccountsService {
       return {
         accountNumber: account.accountNumber,
         nickname: recipient.nickname,
+        isRecipient: true,
       };
     } else {
       const user = await this.userModel.findById(account.userId);
       return {
         accountNumber: account.accountNumber,
         nickname: user.username,
+        isRecipient: false,
       };
     }
   }
