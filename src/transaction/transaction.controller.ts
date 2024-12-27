@@ -10,7 +10,11 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import { InternalTransferDto } from './dto/transaction-create.dto';
+import {
+  InternalTransferDto,
+  ExternalTransferDto,
+  ExternalTransferReceiveDto,
+} from './dto/transaction-create.dto';
 import { BearerToken } from 'src/auth/decorators/auth.decorator';
 import { VerifyOtpTransactionDto } from './dto/verify-otp.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
@@ -24,7 +28,7 @@ import { UserRole } from 'src/auth/schemas/user.schema';
 @ApiBearerAuth('access-token')
 @Controller('transactions')
 export class TransactionController {
-  constructor(private readonly transactionService: TransactionService) { }
+  constructor(private readonly transactionService: TransactionService) {}
 
   @Get('history')
   @ApiOperation({
@@ -64,12 +68,34 @@ export class TransactionController {
   }
 
   @Post('verify-otp')
-  @ApiOperation({ summary: 'Verify OTP for transaction' })
+  @ApiOperation({ summary: 'Verify OTP for any transaction type' })
   @ApiResponse({
     status: 200,
     description: 'OTP verified and transaction completed',
   })
   async verifyOtp(@Body() verifyOtpDto: VerifyOtpTransactionDto) {
     return this.transactionService.verifyOtp(verifyOtpDto);
+  }
+
+  @Post('external-transfer')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create external transfer to other bank' })
+  async createExternalTransfer(
+    @BearerToken() accessToken: string,
+    @Body() transferDto: ExternalTransferDto,
+  ) {
+    return this.transactionService.createExternalTransfer(
+      accessToken,
+      transferDto,
+    );
+  }
+
+  @Post('external-transfer/receive')
+  @ApiOperation({ summary: 'Receive transfer from other bank' })
+  async receiveExternalTransfer(
+    @Body() transferDto: ExternalTransferReceiveDto,
+  ) {
+    return this.transactionService.processIncomingExternalTransfer(transferDto);
   }
 }

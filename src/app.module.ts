@@ -16,6 +16,7 @@ import { AccountsModule } from './accounts/accounts.module';
 import { RecipientsModule } from './recipient/recipient.module';
 import { LoggingModule } from './logging/logging.module';
 import { EmployeeModule } from './employee/employee.module';
+import { BanksModule } from './banks/banks.module';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { EmployeeModule } from './employee/employee.module';
     RecipientsModule,
     LoggingModule,
     EmployeeModule,
+    BanksModule,
 
     // AccountsModule,
     // TransactionsModule,

@@ -22,6 +22,9 @@ export class Bank {
 
   @Prop({ default: true })
   isActive: boolean;
+
+  @Prop({ default: 0 })
+  apiUrl: string;
 }
 
 export const BankSchema = SchemaFactory.createForClass(Bank);

@@ -3,6 +3,8 @@ import {
   Injectable,
   NotFoundException,
   UnauthorizedException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -11,12 +13,21 @@ import {
   TransactionHistoryQueryDto,
   TransactionHistoryResponseDto,
 } from './dto/transaction-history.dto';
-import { InternalTransferDto } from './dto/transaction-create.dto';
+import {
+  ExternalTransferDto,
+  ExternalTransferReceiveDto,
+  InternalTransferDto,
+} from './dto/transaction-create.dto';
 import { Account } from 'src/models/accounts/schemas/account.schema';
 import { MailService } from 'src/mail/mail.service';
 import { JwtUtil } from 'src/utils/jwt.util';
 import { VerifyOtpTransactionDto } from './dto/verify-otp.dto';
 import { User } from 'src/auth/schemas/user.schema';
+// import { InjectRepository } from '@nestjs/typeorm';
+// import { Repository } from 'typeorm';
+import { Bank } from 'src/models/banks/schemas/bank.schema';
+import axios from 'axios';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class TransactionService {
@@ -24,8 +35,10 @@ export class TransactionService {
     @InjectModel(Transaction.name) private transactionModel: Model<Transaction>,
     @InjectModel(Account.name) private accountModel: Model<Account>,
     @InjectModel(User.name) private userModel: Model<User>,
+    @InjectModel(Bank.name) private bankModel: Model<Bank>,
     private mailService: MailService,
     private JWTUtil: JwtUtil,
+    private configService: ConfigService,
   ) {}
 
   async getTransactionHistory(
@@ -124,7 +137,7 @@ export class TransactionService {
     const fromAccount = await this.accountModel.findOne({
       userId: decoded.sub,
     });
-    console.log(fromAccount);
+
     const { toAccount, amount, content, feeType } = internalTransferDto;
 
     const receiverAccount = await this.accountModel.findOne({
@@ -135,19 +148,15 @@ export class TransactionService {
       throw new NotFoundException('Account not found');
     }
 
-    if (fromAccount.balance < amount) {
-      throw new BadRequestException('Insufficient balance');
-    }
-
-    const fee = amount / 100; // Example fee
+    const fee = Math.floor(amount / 100); // 1% fee
     const totalAmount = feeType === 'sender' ? amount + fee : amount;
 
     if (fromAccount.balance < totalAmount) {
-      throw new BadRequestException('Insufficient balance to cover the fee');
+      throw new BadRequestException('Insufficient balance');
     }
 
     const transaction = new this.transactionModel({
-      fromAccount: fromAccount.accountNumber.toString(),
+      fromAccount: fromAccount.accountNumber,
       toAccount: toAccount,
       amount: amount,
       content: content,
@@ -157,63 +166,222 @@ export class TransactionService {
       type: 'internal_transfer',
     });
 
-    await transaction.save();
+    const savedTransaction = await transaction.save();
+
     const senderUser = await this.userModel.findById(fromAccount.userId);
-    console.log(senderUser);
-    // Send OTP to the sender's email
+    if (!senderUser) {
+      throw new NotFoundException('Sender user not found');
+    }
+
     await this.mailService.sendOtpToVerifyTransaction(
       senderUser.email,
-      transaction._id.toString(),
+      savedTransaction._id.toString(),
     );
 
-    return transaction;
+    return savedTransaction;
   }
 
   async verifyOtp(verifyOtpDto: VerifyOtpTransactionDto): Promise<Transaction> {
-    const { otp, transactionId } = verifyOtpDto;
+    const { otp, transactionId, type } = verifyOtpDto;
 
     const transaction = await this.transactionModel.findById(transactionId);
     if (!transaction) {
       throw new NotFoundException('Transaction not found');
     }
 
-    console.log(transaction);
-    const senderAccount = await this.accountModel.findOne({
-      accountNumber: transaction.fromAccount,
-    });
-    if (!senderAccount) {
-      throw new NotFoundException('Sender account not found');
-    }
-
     const isValidOtp = await this.mailService.verifyOtpTransaction(
       transactionId,
       otp,
     );
+
     if (!isValidOtp) {
       throw new UnauthorizedException('Invalid OTP');
     }
 
+    if (type === 'internal') {
+      return this.processInternalTransfer(transaction);
+    } else {
+      return this.processExternalTransfer(transaction);
+    }
+  }
+
+  private async processInternalTransfer(
+    transaction: Transaction,
+  ): Promise<Transaction> {
+    const senderAccount = await this.accountModel.findOne({
+      accountNumber: transaction.fromAccount,
+    });
     const receiverAccount = await this.accountModel.findOne({
       accountNumber: transaction.toAccount,
     });
-    if (!receiverAccount) {
-      throw new NotFoundException('Receiver account not found');
+
+    if (!senderAccount || !receiverAccount) {
+      throw new NotFoundException('Account not found');
     }
 
+    // Calculate amounts based on fee type
+    const fee = transaction.fee || 0;
     if (transaction.feeType === 'sender') {
-      senderAccount.balance -= transaction.amount + transaction.fee;
+      senderAccount.balance -= transaction.amount + fee;
       receiverAccount.balance += transaction.amount;
     } else {
       senderAccount.balance -= transaction.amount;
-      receiverAccount.balance += transaction.amount - transaction.fee;
+      receiverAccount.balance += transaction.amount - fee;
     }
 
-    await senderAccount.save();
-    await receiverAccount.save();
+    // Save the updated balances
+    await Promise.all([
+      this.accountModel.findByIdAndUpdate(senderAccount._id, {
+        $set: { balance: senderAccount.balance },
+      }),
+      this.accountModel.findByIdAndUpdate(receiverAccount._id, {
+        $set: { balance: receiverAccount.balance },
+      }),
+    ]);
 
-    transaction.status = 'completed';
+    // Update transaction status
+    const updatedTransaction = await this.transactionModel.findByIdAndUpdate(
+      transaction._id,
+      { $set: { status: 'completed' } },
+      { new: true },
+    );
+
+    if (!updatedTransaction) {
+      throw new NotFoundException('Failed to update transaction');
+    }
+
+    return updatedTransaction;
+  }
+
+  private async processExternalTransfer(
+    transaction: Transaction,
+  ): Promise<Transaction> {
+    const bank = await this.bankModel.findOne({
+      where: { id: transaction.bankId },
+    });
+
+    try {
+      const response = await axios.post(
+        `${bank.apiUrl}/transactions/external-transfer/receive`,
+        {
+          toAccount: transaction.toAccount,
+          bankId: transaction.bankId,
+          amount: transaction.amount,
+          content: transaction.content,
+          feeType: transaction.feeType,
+          sourceBankId: this.configService.get('BANK_ID'),
+          //sourceTransactionId: transaction.id,
+        },
+      );
+
+      if (response.data.success) {
+        transaction.status = 'completed';
+        await this.transactionModel.findByIdAndUpdate(
+          transaction._id,
+          transaction,
+        );
+        const senderAccount = await this.accountModel.findOne({
+          accountNumber: transaction.fromAccount,
+        });
+
+        if (!senderAccount) {
+          throw new NotFoundException('Sender account not found');
+        }
+
+        senderAccount.balance -= transaction.amount;
+        await senderAccount.save();
+        return transaction;
+      }
+
+      throw new HttpException(
+        'External transfer failed',
+        HttpStatus.BAD_REQUEST,
+      );
+    } catch (error) {
+      console.log(error);
+      transaction.status = 'failed';
+      await this.transactionModel.findByIdAndUpdate(
+        transaction._id,
+        transaction,
+      );
+      throw new HttpException(
+        'External transfer failed',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  async createExternalTransfer(
+    accessToken: string,
+    transferDto: ExternalTransferDto,
+  ) {
+    const decoded = this.JWTUtil.decodeJwt(accessToken);
+
+    const bank = await this.bankModel.findById(transferDto.bankId);
+    if (!bank) {
+      throw new HttpException('Bank not found', HttpStatus.NOT_FOUND);
+    }
+
+    const account = await this.accountModel.findOne({ userId: decoded.sub });
+    if (!account) {
+      throw new HttpException('Account not found', HttpStatus.NOT_FOUND);
+    }
+
+    const transaction = new this.transactionModel({
+      toAccount: transferDto.toAccount,
+      amount: transferDto.amount,
+      content: transferDto.content,
+      type: 'external_transfer',
+      status: 'pending',
+      bankId: transferDto.bankId,
+    });
+
+    await this.transactionModel.create(transaction);
+
+    const senderUser = await this.userModel.findById(account.userId);
+    if (!senderUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Send OTP to the sender's email
+    await this.mailService.sendOtpToVerifyTransaction(
+      senderUser.email,
+      transaction._id.toString(),
+    );
+
+    return { transactionId: transaction.id };
+  }
+
+  async processIncomingExternalTransfer(
+    transferDto: ExternalTransferReceiveDto,
+  ) {
+    const sourceBank = await this.bankModel.findById(transferDto.sourceBankId);
+    if (!sourceBank) {
+      throw new HttpException('Source bank not found', HttpStatus.NOT_FOUND);
+    }
+
+    const account = await this.accountModel.findOne({
+      accountNumber: transferDto.toAccount,
+    });
+    if (!account) {
+      throw new HttpException('Account not found', HttpStatus.NOT_FOUND);
+    }
+
+    const transaction = new this.transactionModel({
+      fromBank: sourceBank.name,
+      toAccount: transferDto.toAccount,
+      amount: transferDto.amount,
+      content: transferDto.content,
+      type: 'external_receive',
+      status: 'completed',
+      externalTransactionId: transferDto.sourceTransactionId,
+    });
+
     await transaction.save();
 
-    return transaction;
+    account.balance += transferDto.amount;
+    await account.save();
+
+    return { success: true };
   }
 }
