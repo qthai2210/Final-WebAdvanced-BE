@@ -35,6 +35,12 @@ export class Debt extends Document {
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Transaction' })
   transactionId: Transaction;
+
+  @Prop({ type: String })
+  otp?: string;
+
+  @Prop({ type: Date })
+  otpExpired?: Date;
 }
 
 export const DebtSchema = SchemaFactory.createForClass(Debt);

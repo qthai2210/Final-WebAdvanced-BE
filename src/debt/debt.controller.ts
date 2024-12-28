@@ -1,12 +1,4 @@
-import {
-  Body,
-  Controller,
-  Get,
-  Post,
-  Param,
-  Patch,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -86,26 +78,38 @@ export class DebtController {
     return this.debtService.getDebtsSummary(accessToken);
   }
 
-  @Patch(':id/cancel')
-  @ApiOperation({ summary: 'Huỷ một khoản nợ' })
-  @ApiResponse({
-    status: 200,
-    description: 'Khoản nợ đã được huỷ thành công',
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Unauthorized - Không có quyền huỷ khoản nợ này',
-  })
-  @ApiResponse({
-    status: 404,
-    description: 'Not Found - Không tìm thấy khoản nợ',
-  })
+  // @Patch(':id/cancel')
+  // @ApiOperation({ summary: 'Huỷ một khoản nợ' })
+  // @ApiResponse({
+  //   status: 200,
+  //   description: 'Khoản nợ đã được huỷ thành công',
+  // })
+  // @ApiResponse({
+  //   status: 401,
+  //   description: 'Unauthorized - Không có quyền huỷ khoản nợ này',
+  // })
+  // @ApiResponse({
+  //   status: 404,
+  //   description: 'Not Found - Không tìm thấy khoản nợ',
+  // })
+  // async cancelDebt(
+  //   @BearerToken() accessToken: string,
+  //   @Param('id') debtId: string,
+  //   @Body() cancelDebtDto: CancelDebtDto,
+  // ) {
+  //   return this.debtService.cancelDebt(accessToken, debtId, cancelDebtDto);
+  // }
+
+  @Post('cancel')
+  @ApiOperation({ summary: 'Cancel a debt' })
+  @ApiResponse({ status: 200, description: 'Debt cancelled successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Debt not found' })
   async cancelDebt(
     @BearerToken() accessToken: string,
-    @Param('id') debtId: string,
     @Body() cancelDebtDto: CancelDebtDto,
   ) {
-    return this.debtService.cancelDebt(accessToken, debtId, cancelDebtDto);
+    return this.debtService.cancelDebt(accessToken, cancelDebtDto);
   }
 
   @Post('pay')

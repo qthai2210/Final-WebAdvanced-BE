@@ -1,12 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsString, IsNotEmpty } from 'class-validator';
 
 export class CancelDebtDto {
-  @ApiProperty({
-    description: 'Lý do huỷ nhắc nợ',
-    example: 'Đã thanh toán bằng tiền mặt',
-  })
-  @IsNotEmpty()
+  @ApiProperty({ description: 'ID of the debt to cancel' })
   @IsString()
+  @IsNotEmpty()
+  debtId: string;
+
+  @ApiProperty({ description: 'Reason for cancelling the debt' })
+  @IsString()
+  @IsNotEmpty()
   cancelReason: string;
 }
