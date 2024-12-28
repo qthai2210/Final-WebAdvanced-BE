@@ -23,14 +23,17 @@ import { Roles } from 'src/auth/decorators/roles.decorator';
 import { UserRole } from 'src/auth/schemas/user.schema';
 
 @ApiTags('transactions')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.CUSTOMER)
-@ApiBearerAuth('access-token')
+// @UseGuards(JwtAuthGuard, RolesGuard)
+// @Roles(UserRole.CUSTOMER)
+// @ApiBearerAuth('access-token')
 @Controller('transactions')
 export class TransactionController {
   constructor(private readonly transactionService: TransactionService) {}
 
   @Get('history')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  @ApiBearerAuth('access-token')
   @ApiOperation({
     summary: 'Get transaction history',
     description: 'Get transaction history for a specific account with filters',
@@ -55,6 +58,9 @@ export class TransactionController {
   }
 
   @Post('internal-transfer')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Initiate internal transfer' })
   @ApiResponse({ status: 201, description: 'Internal transfer initiated' })
   async initiateInternalTransfer(
@@ -68,6 +74,9 @@ export class TransactionController {
   }
 
   @Post('verify-otp')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Verify OTP for any transaction type' })
   @ApiResponse({
     status: 200,
@@ -78,8 +87,9 @@ export class TransactionController {
   }
 
   @Post('external-transfer')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Create external transfer to other bank' })
   async createExternalTransfer(
     @BearerToken() accessToken: string,

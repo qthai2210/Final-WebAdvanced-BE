@@ -72,6 +72,7 @@ export class ExternalTransferDto {
 }
 
 export class ExternalTransferReceiveDto {
+  fromAccount: string;
   @ApiProperty({
     example: '2436521546',
     description: 'Receiver account number in our bank',
@@ -101,11 +102,6 @@ export class ExternalTransferReceiveDto {
   @IsNotEmpty()
   sourceBankId: string;
 
-  @ApiProperty({
-    example: 'TRANS123',
-    description: 'Original transaction ID from source bank',
-  })
-  @IsString()
-  @IsNotEmpty()
-  sourceTransactionId: string;
+  fee: number;
+  feeType: string;
 }

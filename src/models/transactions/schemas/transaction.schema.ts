@@ -53,6 +53,12 @@ export class Transaction {
 
   @Prop()
   signature: string;
+
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Bank' })
+  fromBankId: Bank;
+
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Bank' })
+  toBankId: Bank;
 }
 
 export const TransactionSchema = SchemaFactory.createForClass(Transaction);

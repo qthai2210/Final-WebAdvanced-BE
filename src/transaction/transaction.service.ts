@@ -256,58 +256,123 @@ export class TransactionService {
   private async processExternalTransfer(
     transaction: Transaction,
   ): Promise<Transaction> {
-    const bank = await this.bankModel.findOne({
-      where: { id: transaction.bankId },
-    });
-
     try {
+      console.log('Preparing external transfer request');
+
+      // First check sender's balance
+      const senderAccount = await this.accountModel.findOne({
+        accountNumber: transaction.fromAccount,
+      });
+
+      if (!senderAccount) {
+        throw new NotFoundException('Sender account not found');
+      }
+
+      if (senderAccount.balance < transaction.amount) {
+        throw new BadRequestException('Insufficient balance');
+      }
+
+      // Calculate fee if applicable
+      const fee = transaction.fee || Math.floor(transaction.amount / 100); // 1% fee
+      const totalAmount =
+        transaction.feeType === 'sender'
+          ? transaction.amount + fee
+          : transaction.amount;
+
+      if (senderAccount.balance < totalAmount) {
+        throw new BadRequestException('Insufficient balance to cover fees');
+      }
+
+      // Prepare payload for external bank
+      const payload = {
+        fromAccount: transaction.fromAccount,
+        toAccount: transaction.toAccount,
+        //fromBankId: this.configService.get('BANK_ID'),
+        amount: transaction.amount,
+        content: transaction.content || 'External Transfer',
+        sourceBankId: this.configService.get('BANK_ID'),
+        sourceTransactionId: transaction._id.toString(),
+        fee: fee,
+        feeType: transaction.feeType,
+      };
+
+      console.log('Sending request with payload:', payload);
+
       const response = await axios.post(
-        `${bank.apiUrl}/transactions/external-transfer/receive`,
+        `${this.configService.get('EXTERNAL_BANK_API_URL')}/transactions/external-transfer/receive`,
+        payload,
         {
-          toAccount: transaction.toAccount,
-          bankId: transaction.bankId,
-          amount: transaction.amount,
-          content: transaction.content,
-          feeType: transaction.feeType,
-          sourceBankId: this.configService.get('BANK_ID'),
-          //sourceTransactionId: transaction.id,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          timeout: 5000, // 5 second timeout
         },
       );
 
+      console.log('Received response:', response.data);
+
       if (response.data.success) {
-        transaction.status = 'completed';
-        await this.transactionModel.findByIdAndUpdate(
-          transaction._id,
-          transaction,
-        );
-        const senderAccount = await this.accountModel.findOne({
-          accountNumber: transaction.fromAccount,
+        // Deduct money from sender's account
+        await this.accountModel.findByIdAndUpdate(senderAccount._id, {
+          $inc: { balance: -totalAmount },
         });
 
-        if (!senderAccount) {
-          throw new NotFoundException('Sender account not found');
-        }
+        // Update transaction status
+        const updatedTransaction =
+          await this.transactionModel.findByIdAndUpdate(
+            transaction._id,
+            {
+              $set: {
+                status: 'completed',
+                fee: fee,
+                finalAmount: totalAmount,
+              },
+            },
+            { new: true },
+          );
 
-        senderAccount.balance -= transaction.amount;
-        await senderAccount.save();
-        return transaction;
+        return updatedTransaction;
       }
 
       throw new HttpException(
-        'External transfer failed',
+        'External transfer failed: ' +
+          (response.data.message || 'Unknown error'),
         HttpStatus.BAD_REQUEST,
       );
     } catch (error) {
-      console.log(error);
-      transaction.status = 'failed';
-      await this.transactionModel.findByIdAndUpdate(
-        transaction._id,
-        transaction,
+      console.error(
+        'External transfer error:',
+        error.response?.data || error.message,
       );
-      throw new HttpException(
-        'External transfer failed',
-        HttpStatus.BAD_REQUEST,
-      );
+
+      // Update transaction to failed status
+      await this.transactionModel.findByIdAndUpdate(transaction._id, {
+        $set: {
+          status: 'failed',
+          errorMessage: error.response?.data?.message || error.message,
+        },
+      });
+
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        throw new HttpException(
+          `External transfer failed: ${error.response.data.message || 'Server Error'}`,
+          error.response.status || HttpStatus.BAD_REQUEST,
+        );
+      } else if (error.request) {
+        // The request was made but no response was received
+        throw new HttpException(
+          'External transfer failed: No response from external bank',
+          HttpStatus.SERVICE_UNAVAILABLE,
+        );
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        throw new HttpException(
+          'External transfer failed: ' + error.message,
+          HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
     }
   }
 
@@ -328,12 +393,15 @@ export class TransactionService {
     }
 
     const transaction = new this.transactionModel({
+      fromAccount: account.accountNumber,
       toAccount: transferDto.toAccount,
       amount: transferDto.amount,
       content: transferDto.content,
       type: 'external_transfer',
       status: 'pending',
+      feeType: transferDto.feeType,
       bankId: transferDto.bankId,
+      toBankId: bank._id,
     });
 
     await this.transactionModel.create(transaction);
@@ -368,13 +436,16 @@ export class TransactionService {
     }
 
     const transaction = new this.transactionModel({
-      fromBank: sourceBank.name,
+      fromBank: sourceBank._id,
+      fromAccount: transferDto.fromAccount,
       toAccount: transferDto.toAccount,
       amount: transferDto.amount,
       content: transferDto.content,
       type: 'external_receive',
       status: 'completed',
-      externalTransactionId: transferDto.sourceTransactionId,
+      feeType: transferDto.feeType,
+      fee: transferDto.fee,
+      //externalTransactionId: transferDto.sourceTransactionId,
     });
 
     await transaction.save();
