@@ -26,6 +26,9 @@ import { Transaction } from '../models/transactions/schemas/transaction.schema';
 
 @Injectable()
 export class DebtService {
+  private readonly MAX_RETRIES = 3;
+  private readonly RETRY_DELAY = 1000; // 1 second
+
   constructor(
     @InjectModel(Debt.name) private debtModel: Model<DebtDocument>,
     @InjectModel(User.name) private userModel: Model<User>, // Thêm inject UserModel
@@ -49,6 +52,25 @@ export class DebtService {
     } catch (error) {
       console.log(error);
       throw new UnauthorizedException('Invalid or expired token');
+    }
+  }
+
+  private async retry<T>(
+    operation: () => Promise<T>,
+    retries = this.MAX_RETRIES,
+  ): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      if (
+        retries > 0 &&
+        (error.message.includes('Write conflict') ||
+          error.message.includes('Transaction has been aborted'))
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, this.RETRY_DELAY));
+        return this.retry(operation, retries - 1);
+      }
+      throw error;
     }
   }
 
@@ -88,7 +110,7 @@ export class DebtService {
 
     await this.notificationService.createNotification({
       userId: toUserId._id.toString(),
-      content: `You have a new debt of ${createDebtDto.amount} from ${user.sub}`,
+      content: `You have a new debt of ${createDebtDto.amount} from ${user.username}`,
       type: 'DEBT_CREATED',
       relatedId: savedDebt._id.toString(),
     });
@@ -176,7 +198,6 @@ export class DebtService {
 
   async cancelDebt(
     accessToken: string,
-    debtId: string,
     cancelDebtDto: CancelDebtDto,
   ): Promise<Debt> {
     const user = this.decodeToken(accessToken);
@@ -185,17 +206,16 @@ export class DebtService {
     try {
       await session.startTransaction();
 
-      // Tìm và lock document trong transaction
       const debt = await this.debtModel
         .findOneAndUpdate(
           {
-            _id: debtId,
-            status: 'pending', // Chỉ tìm những khoản nợ pending
+            _id: cancelDebtDto.debtId,
+            status: 'pending',
             $or: [{ fromUserId: user.sub }, { toUserId: user.sub }],
           },
           { status: 'cancelled' },
           {
-            new: true, // Trả về document sau khi update
+            new: true,
             session,
             runValidators: true,
           },
@@ -205,21 +225,26 @@ export class DebtService {
         .exec();
 
       if (!debt) {
-        throw new NotFoundException(
-          'Không tìm thấy khoản nợ hoặc khoản nợ không thể hủy',
-        );
+        throw new NotFoundException('Debt not found or cannot be cancelled');
       }
 
-      // Gửi thông báo
-      const isCancelledByCreator =
-        debt.fromUserId.toString() === user.sub.toString();
-      const notifyUserId = isCancelledByCreator
-        ? debt.toUserId.toString()
+      // Fix: Properly extract IDs from populated fields
+      const fromUserId = (debt.fromUserId as any)._id
+        ? (debt.fromUserId as any)._id.toString()
         : debt.fromUserId.toString();
+      const toUserId = (debt.toUserId as any)._id
+        ? (debt.toUserId as any)._id.toString()
+        : debt.toUserId.toString();
+
+      const isCancelledByCreator = fromUserId === user.sub;
+      const notifyUserId = isCancelledByCreator ? toUserId : fromUserId;
+
+      const fromUserName = debt.fromUserId.fullName || 'Unknown';
+      const toUserName = debt.toUserId.fullName || 'Unknown';
 
       const notificationContent = isCancelledByCreator
-        ? `Người tạo nợ ${debt.fromUserId.fullName} đã huỷ khoản nợ "${debt.content}" với lý do: ${cancelDebtDto.cancelReason}`
-        : `Người nợ ${debt.toUserId.fullName} đã huỷ khoản nợ "${debt.content}" với lý do: ${cancelDebtDto.cancelReason}`;
+        ? `Debt creator ${fromUserName} cancelled the debt "${debt.content}" with reason: ${cancelDebtDto.cancelReason}`
+        : `Debtor ${toUserName} cancelled the debt "${debt.content}" with reason: ${cancelDebtDto.cancelReason}`;
 
       await this.notificationService.createNotification({
         userId: notifyUserId,
@@ -239,101 +264,120 @@ export class DebtService {
   }
 
   async payDebt(accessToken: string, payDebtDto: PayDebtDto) {
-    const session = await this.debtModel.startSession();
-    session.startTransaction();
+    return this.retry(async () => {
+      let session;
+      try {
+        session = await this.debtModel.db.startSession();
 
-    try {
-      const decoded = this.decodeToken(accessToken);
-      const user = await this.userModel.findById(decoded.sub);
-      if (!user) throw new UnauthorizedException('User not found');
-
-      const debt = await this.debtModel.findById(payDebtDto.debtId);
-      if (!debt) throw new NotFoundException('Debt not found');
-
-      if (debt.status === 'paid')
-        throw new BadRequestException('Debt already paid');
-
-      if (debt.toUserId.toString() !== user._id.toString())
-        throw new BadRequestException('You are not the debtor');
-
-      // Verify OTP
-      const isValidOtp = await this.mailService.verifyOtp(
-        user.email,
-        payDebtDto.otp,
-      );
-      if (!isValidOtp) throw new BadRequestException('Invalid OTP');
-
-      // Get accounts for both users
-      const [debtorAccount, creditorAccount] = await Promise.all([
-        this.accountModel.findOne({ userId: debt.toUserId, type: 'payment' }),
-        this.accountModel.findOne({ userId: debt.fromUserId, type: 'payment' }),
-      ]);
-
-      if (!debtorAccount || !creditorAccount)
-        throw new BadRequestException('Payment accounts not found');
-
-      if (debtorAccount.balance < debt.amount)
-        throw new BadRequestException('Insufficient balance');
-
-      // Create transaction record
-      const transaction = new this.transactionModel({
-        fromAccount: debtorAccount.accountNumber,
-        toAccount: creditorAccount.accountNumber,
-        amount: debt.amount,
-        type: 'debt_payment',
-        status: 'completed',
-        content: `Payment for debt: ${debt.content}`,
-        fee: 0,
-        feeType: 'sender',
-      });
-
-      // Update account balances
-      await Promise.all([
-        this.accountModel.findByIdAndUpdate(
-          debtorAccount._id,
-          { $inc: { balance: -debt.amount } },
-          { session },
-        ),
-        this.accountModel.findByIdAndUpdate(
-          creditorAccount._id,
-          { $inc: { balance: debt.amount } },
-          { session },
-        ),
-        transaction.save({ session }),
-        this.debtModel.findByIdAndUpdate(
+        // First verify OTP outside the transaction
+        const isValidOtp = await this.mailService.verifyDebtPaymentOtp(
           payDebtDto.debtId,
-          {
-            status: 'paid',
-            paidAt: new Date(),
-            transactionId: transaction._id,
-          },
-          { session, new: true },
-        ),
-      ]);
+          payDebtDto.otp,
+        );
 
-      // Send notification
-      await this.notificationService.createNotification({
-        userId: debt.fromUserId.toString(),
-        content: `Your debt of ${debt.amount} has been paid`,
-        type: 'DEBT_PAYMENT',
-        relatedId: debt._id.toString(),
-      });
+        if (!isValidOtp) {
+          throw new BadRequestException('Invalid or expired OTP');
+        }
 
-      await session.commitTransaction();
-      return transaction;
-    } catch (error) {
-      await session.abortTransaction();
-      throw error;
-    } finally {
-      session.endSession();
-    }
+        const transaction = await session.withTransaction(async () => {
+          const decoded = this.decodeToken(accessToken);
+          const user = await this.userModel.findById(decoded.sub);
+          if (!user) throw new UnauthorizedException('User not found');
+
+          // Find and lock the debt document
+          const debt = await this.debtModel
+            .findOne({
+              _id: payDebtDto.debtId,
+              status: 'pending',
+            })
+            .populate('fromUserId', '_id fullName')
+            .populate('toUserId', '_id fullName')
+            .session(session);
+
+          if (!debt) {
+            throw new NotFoundException('Debt not found or already processed');
+          }
+
+          // Don't verify OTP again here
+
+          // Get and lock the accounts
+          const [debtorAccount, creditorAccount] = await Promise.all([
+            this.accountModel
+              .findOne({ userId: debt.toUserId, type: 'payment' })
+              .session(session),
+            this.accountModel
+              .findOne({ userId: debt.fromUserId, type: 'payment' })
+              .session(session),
+          ]);
+
+          if (!debtorAccount || !creditorAccount)
+            throw new BadRequestException('Payment accounts not found');
+
+          if (debtorAccount.balance < debt.amount)
+            throw new BadRequestException('Insufficient balance');
+
+          const transaction = new this.transactionModel({
+            fromAccount: debtorAccount.accountNumber,
+            toAccount: creditorAccount.accountNumber,
+            amount: debt.amount,
+            type: 'debt_payment',
+            status: 'completed',
+            content: `Payment for debt: ${debt.content}`,
+            fee: 0,
+            feeType: 'sender',
+          });
+
+          // Execute all updates within the transaction
+          await Promise.all([
+            this.accountModel.findByIdAndUpdate(
+              debtorAccount._id,
+              { $inc: { balance: -debt.amount } },
+              { session, new: true },
+            ),
+            this.accountModel.findByIdAndUpdate(
+              creditorAccount._id,
+              { $inc: { balance: debt.amount } },
+              { session, new: true },
+            ),
+            transaction.save({ session }),
+            this.debtModel.findByIdAndUpdate(
+              debt._id,
+              {
+                status: 'paid',
+                paidAt: new Date(),
+                transactionId: transaction._id,
+              },
+              { session, new: true },
+            ),
+          ]);
+
+          // Return both transaction and debt for notification
+          return { transaction, debt };
+        });
+
+        // Create notification with proper details
+        if (transaction?.debt) {
+          await this.notificationService.createNotification({
+            userId: transaction.debt.fromUserId._id.toString(), // Send to creditor
+            content: `Debt payment of ${transaction.debt.amount} VND received from ${transaction.debt.toUserId.fullName} for "${transaction.debt.content}"`,
+            type: 'DEBT_PAYMENT',
+            relatedId: transaction.debt._id.toString(),
+          });
+        }
+
+        return transaction.transaction;
+      } finally {
+        if (session) {
+          await session.endSession();
+        }
+      }
+    });
   }
 
   async sendPaymentOtp(accessToken: string, sendOtpDto: SendPaymentOtpDto) {
     const decoded = this.decodeToken(accessToken);
-
-    // Lấy thông tin user đầy đủ từ database
     const user = await this.userModel.findById(decoded.sub);
+
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
@@ -346,13 +390,17 @@ export class DebtService {
     if (debt.status !== 'pending') {
       throw new BadRequestException('Debt is not in pending status');
     }
+    // console.log('abcdefg');
+    // console.log(debt.toUserId.toString(), user._id.toString());
+    // if (debt.toUserId.toString() !== user._id.toString()) {
+    //   throw new BadRequestException('You are not the debtor');
+    // }
 
-    if (debt.toUserId.toString() !== user._id.toString()) {
-      throw new BadRequestException('You are not the debtor');
-    }
-
-    // Gửi OTP với email từ user object
-    await this.authService.initiateForgotPassword(user.email);
+    await this.mailService.sendOtpToVerifyDebtPayment(
+      user.email,
+      debt._id.toString(),
+      debt.amount,
+    );
 
     return {
       message: 'OTP has been sent to your email',

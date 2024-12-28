@@ -9,6 +9,7 @@ import {
   Transaction,
   TransactionSchema,
 } from 'src/models/transactions/schemas/transaction.schema';
+import { DebtSchema } from 'src/models/debts/schemas/debt.schema';
 
 @Global()
 @Module({
@@ -45,6 +46,7 @@ import {
     MongooseModule.forFeature([
       { name: Transaction.name, schema: TransactionSchema },
     ]),
+    MongooseModule.forFeature([{ name: 'Debt', schema: DebtSchema }]),
   ],
   providers: [MailService],
   exports: [MailService], // 👈 export for DI

@@ -4,6 +4,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User } from '../auth/schemas/user.schema';
 import { Transaction } from 'src/models/transactions/schemas/transaction.schema';
+import { Debt } from 'src/models/debts/schemas/debt.schema';
 
 @Injectable()
 export class MailService {
@@ -11,6 +12,7 @@ export class MailService {
     private mailerService: MailerService,
     @InjectModel(User.name) private userModel: Model<User>,
     @InjectModel(Transaction.name) private transactionModel: Model<Transaction>,
+    @InjectModel(Debt.name) private debtModel: Model<any>,
   ) {}
 
   async sendUserConfirmation(user: User, token: string) {
@@ -138,5 +140,78 @@ export class MailService {
     }
 
     return true;
+  }
+
+  async sendOtpToVerifyDebtPayment(
+    email: string,
+    debtId: string,
+    amount: number,
+  ): Promise<void> {
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiry = new Date();
+    otpExpiry.setMinutes(otpExpiry.getMinutes() + 15);
+
+    // Update with error handling and verification
+    const result = await this.debtModel.findByIdAndUpdate(
+      debtId,
+      {
+        $set: {
+          otp: otp,
+          otpExpired: otpExpiry,
+        },
+      },
+      { new: true },
+    );
+
+    console.log('Updated debt with OTP:', {
+      debtId,
+      otp,
+      otpExpiry,
+      success: !!result,
+    });
+
+    if (!result) {
+      throw new Error('Failed to save OTP to debt record');
+    }
+
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'OTP for Debt Payment Verification',
+      html: `
+        <h3>Debt Payment Verification</h3>
+        <p>Your OTP for debt payment verification is: <strong>${otp}</strong></p>
+        <p>Amount to be paid: ${amount}</p>
+        <p>This OTP will expire in 15 minutes.</p>
+        <p>If you did not initiate this payment, please contact support immediately.</p>
+      `,
+    });
+  }
+
+  async verifyDebtPaymentOtp(debtId: string, otp: string): Promise<boolean> {
+    console.log('Verifying OTP:', { debtId, otp });
+
+    const debt = await this.debtModel.findOneAndUpdate(
+      {
+        _id: debtId,
+        otp: otp,
+        otpExpired: { $gt: new Date() },
+        status: 'pending',
+      },
+      {
+        $unset: { otp: '', otpExpired: '' },
+      },
+      {
+        new: false, // Return the document before update
+        select: '+otp +otpExpired',
+      },
+    );
+
+    console.log('Verification result:', {
+      exists: !!debt,
+      otp: debt?.otp,
+      expiry: debt?.otpExpired,
+    });
+
+    return !!debt;
   }
 }
