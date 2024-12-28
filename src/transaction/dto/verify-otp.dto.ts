@@ -1,11 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, Length } from 'class-validator';
+import { IsString, IsNotEmpty, IsEnum } from 'class-validator';
 
 export class VerifyOtpTransactionDto {
   @ApiProperty({ example: '123456', description: 'OTP code' })
   @IsString()
   @IsNotEmpty()
-  @Length(6, 6)
   otp: string;
 
   @ApiProperty({
@@ -15,4 +14,12 @@ export class VerifyOtpTransactionDto {
   @IsString()
   @IsNotEmpty()
   transactionId: string;
+
+  @ApiProperty({
+    example: 'internal',
+    description: 'Transaction type',
+    enum: ['internal', 'external'],
+  })
+  @IsEnum(['internal', 'external'])
+  type: 'internal' | 'external';
 }
