@@ -28,6 +28,7 @@ import { User } from 'src/auth/schemas/user.schema';
 import { Bank } from 'src/models/banks/schemas/bank.schema';
 import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
+import { RsaUtil } from '../utils/rsa.util';
 
 @Injectable()
 export class TransactionService {
@@ -39,6 +40,7 @@ export class TransactionService {
     private mailService: MailService,
     private JWTUtil: JwtUtil,
     private configService: ConfigService,
+    private rsaUtil: RsaUtil,
   ) {}
 
   async getTransactionHistory(
@@ -287,25 +289,28 @@ export class TransactionService {
       const payload = {
         fromAccount: transaction.fromAccount,
         toAccount: transaction.toAccount,
-        //fromBankId: this.configService.get('BANK_ID'),
         amount: transaction.amount,
         content: transaction.content || 'External Transfer',
         sourceBankId: this.configService.get('BANK_ID'),
         sourceTransactionId: transaction._id.toString(),
         fee: fee,
         feeType: transaction.feeType,
+        timestamp: new Date().toISOString(), // Add timestamp for security
       };
 
-      console.log('Sending request with payload:', payload);
+      // Encrypt the payload
+      const encryptedPayload = this.rsaUtil.encryptWithPublicKey(payload);
+
+      console.log('Sending encrypted request');
 
       const response = await axios.post(
         `${this.configService.get('EXTERNAL_BANK_API_URL')}/transactions/external-transfer/receive`,
-        payload,
+        { encryptedData: encryptedPayload },
         {
           headers: {
             'Content-Type': 'application/json',
           },
-          timeout: 5000, // 5 second timeout
+          timeout: 5000,
         },
       );
 
@@ -423,36 +428,58 @@ export class TransactionService {
   async processIncomingExternalTransfer(
     transferDto: ExternalTransferReceiveDto,
   ) {
-    const sourceBank = await this.bankModel.findById(transferDto.sourceBankId);
-    if (!sourceBank) {
-      throw new HttpException('Source bank not found', HttpStatus.NOT_FOUND);
+    try {
+      // Decrypt the incoming data
+      const decryptedData = this.rsaUtil.decryptWithPrivateKey(
+        transferDto.encryptedData,
+      );
+
+      // Validate timestamp to prevent replay attacks
+      const timestamp = new Date(decryptedData.timestamp);
+      const now = new Date();
+      if (now.getTime() - timestamp.getTime() > 5 * 60 * 1000) {
+        // 5 minutes
+        throw new HttpException('Request expired', HttpStatus.BAD_REQUEST);
+      }
+
+      const sourceBank = await this.bankModel.findById(
+        decryptedData.sourceBankId,
+      );
+      if (!sourceBank) {
+        throw new HttpException('Source bank not found', HttpStatus.NOT_FOUND);
+      }
+
+      const account = await this.accountModel.findOne({
+        accountNumber: decryptedData.toAccount,
+      });
+      if (!account) {
+        throw new HttpException('Account not found', HttpStatus.NOT_FOUND);
+      }
+
+      const transaction = new this.transactionModel({
+        fromBank: sourceBank._id,
+        fromAccount: decryptedData.fromAccount,
+        toAccount: decryptedData.toAccount,
+        amount: decryptedData.amount,
+        content: decryptedData.content,
+        type: 'external_receive',
+        status: 'completed',
+        feeType: decryptedData.feeType,
+        fee: decryptedData.fee,
+      });
+
+      await transaction.save();
+
+      account.balance += decryptedData.amount;
+      await account.save();
+
+      return { success: true };
+    } catch (error) {
+      console.error('Decryption error:', error);
+      throw new HttpException(
+        'Failed to process encrypted transfer',
+        HttpStatus.BAD_REQUEST,
+      );
     }
-
-    const account = await this.accountModel.findOne({
-      accountNumber: transferDto.toAccount,
-    });
-    if (!account) {
-      throw new HttpException('Account not found', HttpStatus.NOT_FOUND);
-    }
-
-    const transaction = new this.transactionModel({
-      fromBank: sourceBank._id,
-      fromAccount: transferDto.fromAccount,
-      toAccount: transferDto.toAccount,
-      amount: transferDto.amount,
-      content: transferDto.content,
-      type: 'external_receive',
-      status: 'completed',
-      feeType: transferDto.feeType,
-      fee: transferDto.fee,
-      //externalTransactionId: transferDto.sourceTransactionId,
-    });
-
-    await transaction.save();
-
-    account.balance += transferDto.amount;
-    await account.save();
-
-    return { success: true };
   }
 }
