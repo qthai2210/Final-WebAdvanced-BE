@@ -6,6 +6,9 @@ export type TransactionDocument = Transaction & Document;
 
 @Schema({ timestamps: true })
 export class Transaction {
+  @Prop({ type: mongoose.Schema.Types.ObjectId, auto: true })
+  _id: mongoose.Schema.Types.ObjectId;
+
   @Prop({ required: true })
   fromAccount: string;
 
@@ -17,7 +20,13 @@ export class Transaction {
 
   @Prop({
     required: true,
-    enum: ['internal_transfer', 'external_transfer', 'debt_payment', 'deposit'],
+    enum: [
+      'internal_transfer',
+      'external_transfer',
+      'debt_payment',
+      'deposit',
+      'external_receive',
+    ],
   })
   type: string;
 
@@ -44,6 +53,12 @@ export class Transaction {
 
   @Prop()
   signature: string;
+
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Bank' })
+  fromBankId: Bank;
+
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Bank' })
+  toBankId: Bank;
 }
 
 export const TransactionSchema = SchemaFactory.createForClass(Transaction);

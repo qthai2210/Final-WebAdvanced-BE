@@ -56,7 +56,13 @@ export class TransactionHistoryResponseDto {
 
   @ApiProperty({
     description: 'Type of transaction',
-    enum: ['internal_transfer', 'external_transfer', 'debt_payment', 'deposit'],
+    enum: [
+      'internal_transfer',
+      'external_transfer',
+      'debt_payment',
+      'deposit',
+      'external_receive',
+    ],
     example: 'internal_transfer',
   })
   type: string;
