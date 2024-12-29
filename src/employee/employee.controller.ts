@@ -55,11 +55,11 @@ export class EmployeeController {
   @Post('deposit-money')
   @ApiOperation({
     summary: 'Deposit ',
-    description: 'Get transaction history for a specific account with filters',
+    description: 'Deposit money to a customer account',
   })
   @ApiResponse({
     status: 200,
-    description: 'Returns the transaction history',
+    description: 'Returns a success',
     type: [TransactionHistoryQueryDto],
   })
   @ApiResponse({

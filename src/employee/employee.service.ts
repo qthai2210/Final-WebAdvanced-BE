@@ -158,7 +158,6 @@ export class EmployeeService {
       data.accountNumber,
       data.username,
     );
-
     if (userAccount) {
       userAccount.balance += data.amount;
       await userAccount.save();
