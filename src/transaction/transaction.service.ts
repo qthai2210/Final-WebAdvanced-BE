@@ -50,8 +50,7 @@ export class TransactionService {
       accountNumber,
       type = 'all',
       page = 1,
-      // limit = 10,
-      limit = 100,
+      limit = 10,
       fromDate,
       toDate,
     } = query;
