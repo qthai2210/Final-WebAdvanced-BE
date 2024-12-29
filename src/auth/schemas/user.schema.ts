@@ -91,7 +91,7 @@ export class User {
   resetPasswordOTPExpires?: Date;
 
   checkLocked(): boolean {
-    return !!(this.lockUntil && this.lockUntil > new Date());
+    return this.status === UserStatus.LOCKED || this.failedLoginAttempts >= 5;
   }
 }
 
@@ -107,9 +107,7 @@ UserSchema.index({ username: 1 });
 UserSchema.index({ identityNumber: 1 });
 
 // Add methods to schema
-UserSchema.methods.checkLocked = function (): boolean {
-  return !!(this.lockUntil && this.lockUntil > new Date());
-};
+UserSchema.methods.checkLocked = User.prototype.checkLocked;
 
 // Add hooks
 UserSchema.pre('save', function (next) {

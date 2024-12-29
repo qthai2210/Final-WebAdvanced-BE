@@ -153,12 +153,32 @@ export class AuthService {
       return null;
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-      return null;
+    if (user.checkLocked()) {
+      throw new UnauthorizedException('Account is locked');
     }
 
-    return user;
+    try {
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      if (!isPasswordValid) {
+        // Increment failed attempts
+        user.failedLoginAttempts += 1;
+        if (user.failedLoginAttempts >= 5) {
+          user.status = UserStatus.LOCKED;
+        }
+        await user.save();
+        return null;
+      }
+
+      // Reset failed attempts on successful login
+      user.failedLoginAttempts = 0;
+      user.lastLoginAt = new Date();
+      await user.save();
+
+      return user;
+    } catch (error) {
+      console.error('Password validation error:', error);
+      throw new BadRequestException('Password validation failed');
+    }
   }
 
   private generateToken(user: UserDocument): AuthData {
@@ -259,9 +279,9 @@ export class AuthService {
         throw new UnauthorizedException('User not found');
       }
 
-      // if (user.isLocked() || user.status === UserStatus.LOCKED) {
-      //   throw new UnauthorizedException('Account is locked');
-      // }
+      if (user.checkLocked()) {
+        throw new UnauthorizedException('Account is locked');
+      }
 
       // Update last login time
       user.lastLoginAt = new Date();
@@ -269,7 +289,7 @@ export class AuthService {
 
       return this.generateToken(user);
     } catch (error) {
-      console.error(error);
+      console.error('Relogin error:', error);
       throw new UnauthorizedException('Invalid or expired token');
     }
   }
