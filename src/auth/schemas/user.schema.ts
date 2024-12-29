@@ -90,7 +90,7 @@ export class User {
   @Prop()
   resetPasswordOTPExpires?: Date;
 
-  isLocked(): boolean {
+  checkLocked(): boolean {
     return !!(this.lockUntil && this.lockUntil > new Date());
   }
 }
@@ -107,7 +107,7 @@ UserSchema.index({ username: 1 });
 UserSchema.index({ identityNumber: 1 });
 
 // Add methods to schema
-UserSchema.methods.isLocked = function (): boolean {
+UserSchema.methods.checkLocked = function (): boolean {
   return !!(this.lockUntil && this.lockUntil > new Date());
 };
 

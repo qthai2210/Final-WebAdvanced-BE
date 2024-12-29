@@ -50,7 +50,7 @@ export class TransactionService {
       accountNumber,
       type = 'all',
       page = 1,
-      limit = 10,
+      limit,
       fromDate,
       toDate,
     } = query;
@@ -109,8 +109,10 @@ export class TransactionService {
             toAccount: 1,
             content: 1,
             fee: 1,
+            feeType: 1,
             status: 1,
             createdAt: 1,
+            updatedAt: 1,
             bankId: 1,
             'bank.name': 1,
             direction: {

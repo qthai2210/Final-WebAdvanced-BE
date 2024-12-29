@@ -259,9 +259,9 @@ export class AuthService {
         throw new UnauthorizedException('User not found');
       }
 
-      if (user.isLocked() || user.status === UserStatus.LOCKED) {
-        throw new UnauthorizedException('Account is locked');
-      }
+      // if (user.isLocked() || user.status === UserStatus.LOCKED) {
+      //   throw new UnauthorizedException('Account is locked');
+      // }
 
       // Update last login time
       user.lastLoginAt = new Date();
@@ -291,7 +291,7 @@ export class AuthService {
       user.password,
     );
     if (!isCurrentPasswordValid) {
-      throw new BadRequestException('Current password is incorrect');
+      throw new UnauthorizedException('Current password is incorrect');
     }
 
     // Verify new password matches confirmation
