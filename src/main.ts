@@ -4,9 +4,22 @@ import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { LoggingInterceptor } from './logging/logging.interceptor';
 import { LoggingService } from './logging/logging.service';
+import { json, urlencoded } from 'express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // Add garbage collection optimization
+  if (global.gc) {
+    global.gc();
+  }
+
+  const app = await NestFactory.create(AppModule, {
+    bodyParser: true,
+    // Limit payload size
+    rawBody: true,
+  });
+
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ limit: '50mb', extended: true }));
 
   // Validation pipe
   app.useGlobalPipes(new ValidationPipe());
@@ -38,6 +51,27 @@ async function bootstrap() {
   SwaggerModule.setup('api', app, document);
   // enable CORS
   app.enableCors();
-  await app.listen(4000);
+
+  // Get port from environment variable or use default
+  const port = process.env.PORT || 10000;
+
+  // Log port configuration
+  console.log(`Application starting on port: ${port}`);
+
+  await app.listen(port, '0.0.0.0', () => {
+    console.log(`Application is running on: http://localhost:${port}`);
+    console.log(`Swagger documentation: http://localhost:${port}/api-docs`);
+  });
 }
-bootstrap();
+
+// Add error handling for uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // Perform cleanup if necessary
+  process.exit(1);
+});
+
+bootstrap().catch((err) => {
+  console.error('Failed to start application:', err);
+  process.exit(1);
+});
