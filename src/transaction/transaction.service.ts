@@ -109,7 +109,6 @@ export class TransactionService {
             toAccount: 1,
             content: 1,
             fee: 1,
-            feeType: 1,
             status: 1,
             createdAt: 1,
             updatedAt: 1,
