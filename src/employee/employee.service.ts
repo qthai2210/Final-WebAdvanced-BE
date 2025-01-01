@@ -13,7 +13,7 @@ export class EmployeeService {
     @InjectModel(Transaction.name) private transactionModel: Model<Transaction>,
     @InjectModel(Account.name) private accountModel: Model<Account>,
     private readonly accountsService: AccountsService,
-  ) { }
+  ) {}
 
   async getTransactionHistory(query: TransactionHistoryQueryDto): Promise<any> {
     const {
@@ -33,10 +33,6 @@ export class EmployeeService {
       status: 'completed',
       $or: [{ fromAccount: accountNumber }, { toAccount: accountNumber }],
     };
-
-    const totalDocuments =
-      await this.transactionModel.countDocuments(matchQuery);
-    const totalPages = Math.ceil(totalDocuments / limitNum);
 
     if (type !== 'all') {
       switch (type) {
@@ -59,6 +55,11 @@ export class EmployeeService {
         $lte: new Date(toDate),
       };
     }
+
+    const totalDocuments =
+      await this.transactionModel.countDocuments(matchQuery);
+    const totalPages = Math.ceil(totalDocuments / limitNum);
+
     const transaction = await this.transactionModel
       .aggregate([
         { $match: matchQuery },
@@ -145,6 +146,7 @@ export class EmployeeService {
         },
       ])
       .exec();
+
     return {
       transaction,
       totalPages,
