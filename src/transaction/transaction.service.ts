@@ -29,7 +29,6 @@ import { Bank } from 'src/models/banks/schemas/bank.schema';
 import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { RsaUtil } from '../utils/rsa.util';
-import { createSuccessResponse } from 'src/ApiRespose/interface/response.interface';
 
 @Injectable()
 export class TransactionService {
@@ -319,12 +318,7 @@ export class TransactionService {
 
       console.log('Received response:', response.data);
 
-      // decypt response
-      const decryptedResponse = this.rsaUtil.decryptWithPrivateKey(
-        response.data.encryptedResponse,
-      );
-
-      if (decryptedResponse.success) {
+      if (response.data.success) {
         // Deduct money from sender's account
         await this.accountModel.findByIdAndUpdate(senderAccount._id, {
           $inc: { balance: -totalAmount },
@@ -349,7 +343,7 @@ export class TransactionService {
 
       throw new HttpException(
         'External transfer failed: ' +
-          (decryptedResponse.message || 'Unknown error'),
+          (response.data.message || 'Unknown error'),
         HttpStatus.BAD_REQUEST,
       );
     } catch (error) {
@@ -481,14 +475,7 @@ export class TransactionService {
       account.balance += decryptedData.amount;
       await account.save();
 
-      const response = createSuccessResponse({
-        transactionId: transaction._id,
-        amount: decryptedData.amount,
-        balance: account.balance,
-      });
-      // encrypt response
-      const encryptedResponse = this.rsaUtil.encryptWithPublicKey(response);
-      return { encryptedResponse };
+      return { success: true };
     } catch (error) {
       console.error('Decryption error:', error);
       throw new HttpException(
