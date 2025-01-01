@@ -72,6 +72,42 @@ export class ExternalTransferDto {
 }
 
 export class ExternalTransferReceiveDto {
+  fromAccount: string;
+  @ApiProperty({
+    example: '2436521546',
+    description: 'Receiver account number in our bank',
+  })
+  //@IsString()
+  //@IsNotEmpty()
+  toAccount: string;
+
+  @ApiProperty({ example: 1000000, description: 'Transfer amount' })
+  //@IsNumber()
+  //@Min(1)
+  amount: number;
+
+  @ApiProperty({
+    example: 'Payment for services',
+    description: 'Transfer content',
+  })
+  //@IsString()
+  //@IsNotEmpty()
+  content: string;
+
+  @ApiProperty({
+    example: '123',
+    description: 'Source bank ID',
+  })
+  // @IsString()
+  // @IsNotEmpty()
+  sourceBankId: string;
+
+  fee: number;
+  feeType: string;
+
+  @ApiProperty({
+    description: 'RSA encrypted transfer data',
+  })
   @IsString()
   @IsNotEmpty()
   encryptedData: string;

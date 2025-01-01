@@ -26,7 +26,7 @@ import {
 @ApiBearerAuth('access-token')
 @Controller('employee')
 export class EmployeeController {
-  constructor(private readonly employeeService: EmployeeService) { }
+  constructor(private readonly employeeService: EmployeeService) {}
 
   @Get('user-transaction-history')
   @ApiOperation({
