@@ -24,9 +24,6 @@ import {
   ResetPasswordDto,
   VerifyOtpDto,
   verifyRegisterOtpDto,
-  LockAccountDto,
-  UnlockAccountDto,
-  VerifyUnlockOtpDto,
 } from './dto/auth.dto';
 import {
   ApiResponse,
@@ -293,6 +290,7 @@ export class AuthController {
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Request account unlock and send OTP' })
   async requestUnlock(@BearerToken() accessToken: string) {
+    console.log('requestUnlock');
     return this.authService.requestUnlock(accessToken);
   }
 
@@ -301,7 +299,10 @@ export class AuthController {
   @Roles(UserRole.CUSTOMER)
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Verify OTP and unlock account' })
-  async verifyUnlock(@BearerToken() accessToken: string, @Body() otp: string) {
+  async verifyUnlock(
+    @BearerToken() accessToken: string,
+    @Body('otp') otp: string,
+  ) {
     return this.authService.verifyUnlockOtp(accessToken, otp);
   }
 }

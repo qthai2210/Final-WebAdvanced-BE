@@ -663,7 +663,7 @@ export class AuthService {
       throw new NotFoundException('User not found');
     }
 
-    if (user.status !== UserStatus.LOCKED) {
+    if (user.status !== UserStatus.NOTTRANSFER) {
       throw new BadRequestException('Account is not locked');
     }
 
@@ -701,7 +701,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired OTP');
     }
 
-    if (user.status !== UserStatus.LOCKED) {
+    if (user.status !== UserStatus.NOTTRANSFER) {
       throw new BadRequestException('Account is not locked');
     }
 
