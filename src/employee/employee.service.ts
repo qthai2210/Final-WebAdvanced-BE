@@ -209,8 +209,8 @@ export class EmployeeService {
     } else {
       const user = await this.userModel.findById(account.userId);
       return {
-        accountNumber: account.accountNumber,
-        nickname: user.username,
+        accountNumber: account?.accountNumber,
+        nickname: user?.username,
         isRecipient: false,
       };
     }
@@ -249,8 +249,8 @@ export class EmployeeService {
       const account = await this.accountModel.findOne({ userId: user._id });
       console.log('Account: ' + account);
       return {
-        accountNumber: account.accountNumber,
-        nickname: user.username,
+        accountNumber: account?.accountNumber,
+        nickname: user?.username,
         isRecipient: false,
       };
     }
