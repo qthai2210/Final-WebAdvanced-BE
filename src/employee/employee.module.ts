@@ -12,6 +12,10 @@ import {
   Account,
   AccountSchema,
 } from 'src/models/accounts/schemas/account.schema';
+import {
+  Recipient,
+  RecipientSchema,
+} from 'src/models/recipients/schemas/recipient.schema';
 
 @Module({
   imports: [
@@ -19,6 +23,7 @@ import {
       { name: Transaction.name, schema: TransactionSchema },
       { name: User.name, schema: UserSchema },
       { name: Account.name, schema: AccountSchema },
+      { name: Recipient.name, schema: RecipientSchema },
     ]),
     AccountsModule,
   ],
