@@ -92,7 +92,9 @@ export class EmployeeController {
   }
 
   @Get(':searchTerm')
-  @ApiOperation({ summary: 'Get account details by account number' })
+  @ApiOperation({
+    summary: 'Get account details by account number or username',
+  })
   @ApiResponse({
     status: 200,
     description: 'Account details retrieved successfully',
