@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -19,6 +27,7 @@ import {
   createErrorResponse,
   createSuccessResponse,
 } from 'src/ApiRespose/interface/response.interface';
+import { BearerToken } from 'src/auth/decorators/auth.decorator';
 
 @ApiTags('Employee')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -26,7 +35,7 @@ import {
 @ApiBearerAuth('access-token')
 @Controller('employee')
 export class EmployeeController {
-  constructor(private readonly employeeService: EmployeeService) {}
+  constructor(private readonly employeeService: EmployeeService) { }
 
   @Get('user-transaction-history')
   @ApiOperation({
@@ -80,5 +89,34 @@ export class EmployeeController {
     } catch (error) {
       return createErrorResponse(404, error);
     }
+  }
+
+  @Get(':searchTerm')
+  @ApiOperation({ summary: 'Get account details by account number' })
+  @ApiResponse({
+    status: 200,
+    description: 'Account details retrieved successfully',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - User is not logged in',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Not Found - Account not found',
+  })
+  async getAccountByAccountNumber(
+    @BearerToken() accessToken: string,
+    @Param('searchTerm') searchTerm: string,
+  ) {
+    const containsLetter = /[a-zA-Z]/.test(searchTerm); // Check if searchTerm contains any letters
+
+    if (!containsLetter)
+      return this.employeeService.getAccountByAccountNumber(
+        accessToken,
+        searchTerm,
+      );
+    else
+      return this.employeeService.getAccountByUsername(accessToken, searchTerm);
   }
 }

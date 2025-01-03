@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Transaction } from 'src/models/transactions/schemas/transaction.schema';
@@ -6,14 +10,20 @@ import { TransactionHistoryQueryDto } from 'src/transaction/dto/transaction-hist
 import { DepositMoneyCreateDto } from './dto/deposit-money-create.dto';
 import { Account } from 'src/models/accounts/schemas/account.schema';
 import { AccountsService } from 'src/accounts/accounts.service';
+import { User } from 'src/auth/schemas/user.schema';
+import { JwtUtil } from 'src/utils/jwt.util';
+import { Recipient } from 'src/models/recipients/schemas/recipient.schema';
 
 @Injectable()
 export class EmployeeService {
   constructor(
     @InjectModel(Transaction.name) private transactionModel: Model<Transaction>,
     @InjectModel(Account.name) private accountModel: Model<Account>,
+    @InjectModel(Recipient.name) private recipientModel: Model<Recipient>,
+    @InjectModel(User.name) private userModel: Model<User>,
+    private JWTUtil: JwtUtil,
     private readonly accountsService: AccountsService,
-  ) {}
+  ) { }
 
   async getTransactionHistory(query: TransactionHistoryQueryDto): Promise<any> {
     const {
@@ -166,6 +176,83 @@ export class EmployeeService {
       return true;
     } else {
       throw new NotFoundException('Account not found');
+    }
+  }
+
+  async getAccountByAccountNumber(
+    accessToken: string,
+    accountNumber: string,
+  ): Promise<any> {
+    const data = await this.JWTUtil.decodeJwt(accessToken);
+    if (!data) {
+      throw new UnauthorizedException('Unauthorized - User is not logged in');
+    }
+
+    const account = await this.accountModel
+      .findOne({ accountNumber: accountNumber })
+      .exec();
+
+    if (!account) {
+      throw new NotFoundException('Account not found');
+    }
+
+    const recipient = await this.recipientModel.findOne({
+      accountNumber: accountNumber,
+      userId: data.sub,
+    });
+
+    if (recipient) {
+      return {
+        accountNumber: account.accountNumber,
+        isRecipient: true,
+      };
+    } else {
+      const user = await this.userModel.findById(account.userId);
+      return {
+        accountNumber: account.accountNumber,
+        nickname: user.username,
+        isRecipient: false,
+      };
+    }
+  }
+
+  async getAccountByUsername(
+    accessToken: string,
+    username: string,
+  ): Promise<any> {
+    const data = await this.JWTUtil.decodeJwt(accessToken);
+    if (!data) {
+      throw new UnauthorizedException('Unauthorized - User is not logged in');
+    }
+
+    const user = await this.userModel.findOne({ username: username }).exec();
+
+    console.log('User: ' + user);
+
+    if (!user) {
+      throw new NotFoundException('Account not found');
+    }
+
+    const recipient = await this.recipientModel.findOne({
+      nickname: username,
+      userId: data.sub,
+    });
+
+    console.log('Recipient: ' + recipient);
+
+    if (recipient) {
+      return {
+        username: user.username,
+        isRecipient: true,
+      };
+    } else {
+      const account = await this.accountModel.findOne({ userId: user._id });
+      console.log('Account: ' + account);
+      return {
+        accountNumber: account.accountNumber,
+        nickname: user.username,
+        isRecipient: false,
+      };
     }
   }
 }
