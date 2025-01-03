@@ -214,4 +214,43 @@ export class MailService {
 
     return !!debt;
   }
+
+  async sendAccountLockedEmail(email: string): Promise<void> {
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'Account Locked Notification',
+      html: `
+        <h1>Account Locked</h1>
+        <p>Your account has been locked for security reasons.</p>
+        <p>If you did not request this action, please contact our support team immediately.</p>
+        <p>If you want to unlock your account, please log in and request an unlock code.</p>
+      `,
+    });
+  }
+
+  async sendUnlockAccountOtp(email: string, otp: string): Promise<void> {
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'Account Unlock OTP',
+      html: `
+        <h1>Account Unlock Verification</h1>
+        <p>Your OTP code to unlock your account is: <strong>${otp}</strong></p>
+        <p>This code will expire in 15 minutes.</p>
+        <p>If you did not request to unlock your account, please ignore this email.</p>
+      `,
+    });
+  }
+
+  async sendAccountUnlockedEmail(email: string): Promise<void> {
+    await this.mailerService.sendMail({
+      to: email,
+      subject: 'Account Unlocked Successfully',
+      html: `
+        <h1>Account Unlocked</h1>
+        <p>Your account has been successfully unlocked.</p>
+        <p>You can now log in to your account normally.</p>
+        <p>If you did not request this action, please contact our support team immediately.</p>
+      `,
+    });
+  }
 }
