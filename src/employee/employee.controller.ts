@@ -91,9 +91,11 @@ export class EmployeeController {
     }
   }
 
-  @Get(':searchTerm')
+  @Get('searchAccount/:searchTerm')
   @ApiOperation({
     summary: 'Get account details by account number or username',
+    description:
+      'Return the account detail (username & account number) from the search term',
   })
   @ApiResponse({
     status: 200,
@@ -107,7 +109,7 @@ export class EmployeeController {
     status: 404,
     description: 'Not Found - Account not found',
   })
-  async getAccountByAccountNumber(
+  async getAccount(
     @BearerToken() accessToken: string,
     @Param('searchTerm') searchTerm: string,
   ) {
