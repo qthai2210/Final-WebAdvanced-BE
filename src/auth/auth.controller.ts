@@ -3,7 +3,7 @@ import {
   Post,
   Body,
   HttpStatus,
-  //UseGuards,
+  UseGuards,
   //Request,
   //HttpCode,
 } from '@nestjs/common';
@@ -34,6 +34,10 @@ import { AuthData } from './interfaces/auth.interface';
 import { BearerToken } from './decorators/auth.decorator';
 import { MailService } from '../mail/mail.service';
 import { LoggingService } from '../logging/logging.service';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RolesGuard } from './guards/roles.guard';
+import { Roles } from './decorators/roles.decorator';
+import { UserRole } from './schemas/user.schema';
 
 @ApiTags('Authentication')
 @ApiBearerAuth()
@@ -269,5 +273,36 @@ export class AuthController {
   })
   async verifyRegisterOtp(@Body() body: verifyRegisterOtpDto) {
     return this.authService.verifyRegisterOtp(body.email, body.otp);
+  }
+
+  @Post('lock-account')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Lock user account' })
+  async lockAccount(@BearerToken() accessToken: string) {
+    return this.authService.lockAccount(accessToken);
+  }
+
+  @Post('request-unlock')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Request account unlock and send OTP' })
+  async requestUnlock(@BearerToken() accessToken: string) {
+    console.log('requestUnlock');
+    return this.authService.requestUnlock(accessToken);
+  }
+
+  @Post('verify-unlock')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Verify OTP and unlock account' })
+  async verifyUnlock(
+    @BearerToken() accessToken: string,
+    @Body('otp') otp: string,
+  ) {
+    return this.authService.verifyUnlockOtp(accessToken, otp);
   }
 }

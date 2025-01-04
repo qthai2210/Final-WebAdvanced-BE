@@ -26,7 +26,7 @@ import axios from 'axios';
 import { AuthData } from './interfaces/auth.interface';
 import { MailService } from 'src/mail/mail.service';
 import { AccountsService } from 'src/accounts/accounts.service';
-import { PaginationDto, PaginatedResponse } from './dto/pagination.dto';
+import { PaginatedResponse } from './dto/pagination.dto';
 import { EmployeeFilterDto } from './dto/employee-filter.dto';
 
 @Injectable()
@@ -463,6 +463,7 @@ export class AuthService {
 
       // Generate 6-digit OTP
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      console.log('Generated OTP:', otp);
       const otpExpiry = new Date();
       otpExpiry.setMinutes(otpExpiry.getMinutes() + 15); // OTP valid for 15 minutes
 
@@ -631,5 +632,89 @@ export class AuthService {
     return this.userModel
       .findOneAndDelete({ _id: id, role: UserRole.EMPLOYEE })
       .exec();
+  }
+
+  async lockAccount(accessToken: string): Promise<{ message: string }> {
+    const payload = this.jwtService.verify(accessToken);
+
+    const user = await this.userModel.findById(payload.sub).exec();
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.status === UserStatus.LOCKED) {
+      throw new BadRequestException('Account is already locked');
+    }
+
+    user.status = UserStatus.NOTTRANSFER;
+    await user.save();
+
+    // Send email notification to user
+    await this.mailService.sendAccountLockedEmail(user.email);
+
+    return { message: 'Account locked successfully' };
+  }
+
+  async requestUnlock(accessToken: string): Promise<{ message: string }> {
+    const payload = this.jwtService.verify(accessToken);
+
+    const user = await this.userModel.findById(payload.sub).exec();
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.status !== UserStatus.NOTTRANSFER) {
+      throw new BadRequestException('Account is not locked');
+    }
+
+    // Generate unlock OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiry = new Date();
+    otpExpiry.setMinutes(otpExpiry.getMinutes() + 15); // OTP valid for 15 minutes
+
+    // Save unlock OTP
+    user.resetPasswordOTP = otp; // Reusing resetPasswordOTP field for unlock OTP
+    user.resetPasswordOTPExpires = otpExpiry;
+    await user.save();
+
+    // Send OTP to user's email
+    await this.mailService.sendUnlockAccountOtp(user.email, otp);
+
+    return { message: 'Unlock OTP has been sent to your email' };
+  }
+
+  async verifyUnlockOtp(
+    accessToken: string,
+    otp: string,
+  ): Promise<{ message: string }> {
+    const payload = this.jwtService.verify(accessToken);
+
+    const user = await this.userModel
+      .findOne({
+        _id: payload.sub,
+        resetPasswordOTP: otp,
+        resetPasswordOTPExpires: { $gt: new Date() },
+      })
+      .exec();
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid or expired OTP');
+    }
+
+    if (user.status !== UserStatus.NOTTRANSFER) {
+      throw new BadRequestException('Account is not locked');
+    }
+
+    // Unlock account
+    user.status = UserStatus.ACTIVE;
+    user.failedLoginAttempts = 0;
+    user.resetPasswordOTP = undefined;
+    user.resetPasswordOTPExpires = undefined;
+    await user.save();
+
+    // Send confirmation email
+    await this.mailService.sendAccountUnlockedEmail(user.email);
+
+    return { message: 'Account unlocked successfully' };
   }
 }

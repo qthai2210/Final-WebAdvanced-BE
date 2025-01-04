@@ -11,6 +11,7 @@ export enum UserStatus {
   ACTIVE = 'active',
   LOCKED = 'locked',
   PENDING = 'pending',
+  NOTTRANSFER = 'nottransfer',
 }
 
 export type UserDocument = User & Document;

@@ -183,3 +183,41 @@ export class verifyRegisterOtpDto {
   @Length(6, 6)
   otp: string;
 }
+
+export class LockAccountDto {
+  @ApiProperty({
+    example: 'user123',
+    description: 'Username to lock',
+  })
+  @IsString()
+  @IsNotEmpty()
+  username: string;
+}
+
+export class UnlockAccountDto {
+  @ApiProperty({
+    example: 'user123',
+    description: 'Username to unlock',
+  })
+  @IsString()
+  @IsNotEmpty()
+  username: string;
+}
+
+export class VerifyUnlockOtpDto {
+  @ApiProperty({
+    example: 'user123',
+    description: 'Username to unlock',
+  })
+  @IsString()
+  @IsNotEmpty()
+  username: string;
+
+  @ApiProperty({
+    example: '123456',
+    description: 'OTP code for unlocking',
+  })
+  @IsString()
+  @IsNotEmpty()
+  otp: string;
+}
