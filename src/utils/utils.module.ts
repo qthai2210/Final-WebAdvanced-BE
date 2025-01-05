@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { JwtUtil } from './jwt.util';
 import { RsaUtil } from './rsa.util';
+import { CryptoUtil } from './crypto.util';
 
 @Global()
 @Module({
@@ -14,7 +15,7 @@ import { RsaUtil } from './rsa.util';
       }),
     }),
   ],
-  providers: [JwtUtil, RsaUtil],
-  exports: [JwtUtil, RsaUtil], // Add RsaUtil to exports
+  providers: [JwtUtil, RsaUtil, CryptoUtil],
+  exports: [JwtUtil, RsaUtil, CryptoUtil], // Add RsaUtil to exports
 })
 export class UtilsModule {}

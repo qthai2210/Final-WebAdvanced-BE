@@ -101,6 +101,15 @@ export class TransactionController {
     );
   }
 
+  @Get('external-transfer/info')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.CUSTOMER)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get external account information' })
+  async getExternalAccountInfo(@Query('accountNumber') accountNumber: string) {
+    return this.transactionService.getExternalAccountInfo(accountNumber);
+  }
+
   @Post('external-transfer/receive')
   @ApiOperation({ summary: 'Receive transfer from other bank' })
   async receiveExternalTransfer(
