@@ -29,6 +29,7 @@ import { Bank } from 'src/models/banks/schemas/bank.schema';
 import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { RsaUtil } from '../utils/rsa.util';
+import { CryptoUtil } from '../utils/crypto.util';
 
 @Injectable()
 export class TransactionService {
@@ -41,6 +42,7 @@ export class TransactionService {
     private JWTUtil: JwtUtil,
     private configService: ConfigService,
     private rsaUtil: RsaUtil,
+    private cryptoUtil: CryptoUtil,
   ) {}
 
   async getTransactionHistory(
@@ -260,9 +262,6 @@ export class TransactionService {
     transaction: Transaction,
   ): Promise<Transaction> {
     try {
-      console.log('Preparing external transfer request');
-
-      // First check sender's balance
       const senderAccount = await this.accountModel.findOne({
         accountNumber: transaction.fromAccount,
       });
@@ -271,12 +270,8 @@ export class TransactionService {
         throw new NotFoundException('Sender account not found');
       }
 
-      if (senderAccount.balance < transaction.amount) {
-        throw new BadRequestException('Insufficient balance');
-      }
-
-      // Calculate fee if applicable
-      const fee = transaction.fee || Math.floor(transaction.amount / 100); // 1% fee
+      // Calculate fee and total amount
+      const fee = Math.floor(transaction.amount / 100); // 1% fee
       const totalAmount =
         transaction.feeType === 'sender'
           ? transaction.amount + fee
@@ -286,44 +281,103 @@ export class TransactionService {
         throw new BadRequestException('Insufficient balance to cover fees');
       }
 
-      // Prepare payload for external bank
-      const payload = {
+      // Prepare transaction data
+      const transferData = {
         fromAccount: transaction.fromAccount,
         toAccount: transaction.toAccount,
         amount: transaction.amount,
-        content: transaction.content || 'External Transfer',
+        content: transaction.content,
         sourceBankId: this.configService.get('BANK_ID'),
-        sourceTransactionId: transaction._id.toString(),
+        timestamp: new Date().toISOString(),
         fee: fee,
         feeType: transaction.feeType,
-        timestamp: new Date().toISOString(), // Add timestamp for security
       };
 
-      // Encrypt the payload
-      const encryptedPayload = this.rsaUtil.encryptWithPublicKey(payload);
+      // Get partner bank details
+      const partnerBank = await this.bankModel.findById(transaction.bankId);
+      if (!partnerBank) {
+        throw new NotFoundException('Partner bank not found');
+      }
 
-      console.log('Sending encrypted request');
+      console.log('Partner bank details:', {
+        bankId: partnerBank._id,
+        secretKey: partnerBank.secretKey,
+        publicKey: partnerBank.publicKey.substring(0, 50) + '...',
+      });
+
+      // Encode the transaction data with signature and hash
+      const encodedData = this.cryptoUtil.encodeTransactionData(
+        transferData,
+        this.configService.get('BANK_PRIVATE_KEY'),
+        partnerBank.secretKey,
+      );
+
+      // Generate request timestamp
+      const timestamp = new Date().toISOString();
+
+      // Create request payload with partnerCode
+      const requestPayload = {
+        partnerCode: this.configService.get('BANK_CODE'),
+        encodedData,
+      };
+
+      // Generate hash for request
+      const hash = this.cryptoUtil.generateAPIHash(
+        requestPayload,
+        timestamp,
+        partnerBank.secretKey,
+      );
+
+      console.log('Hash verification:', {
+        payload: requestPayload,
+        timestamp,
+        secretKey: partnerBank.secretKey,
+        hash,
+      });
+
+      // Generate signature for request
+      const signature = this.cryptoUtil.signData(
+        requestPayload,
+        this.configService.get('BANK_PRIVATE_KEY'),
+      );
+
+      // Make API call with security headers
+      console.log('Calling partner bank API:', {
+        url: `${partnerBank.apiUrl}/external/receive-transfer`,
+        bankCode: this.configService.get('BANK_CODE'),
+        timestamp,
+        headers: {
+          'Partner-Code': this.configService.get('BANK_CODE'),
+          'Request-Time': timestamp,
+          'X-Hash': hash,
+          'X-Signature': signature,
+        },
+      });
+
+      console.log('Request payload:', requestPayload);
 
       const response = await axios.post(
-        `${this.configService.get('EXTERNAL_BANK_API_URL')}/transactions/external-transfer/receive`,
-        { encryptedData: encryptedPayload },
+        `${this.configService.get('EXTERNAL_BANK_API_URL')}/external/receive-transfer`, // Sửa URL từ configService
+        requestPayload,
         {
           headers: {
+            'Partner-Code': this.configService.get('BANK_CODE'),
+            'Request-Time': timestamp,
+            'X-Signature': signature,
+            'X-Hash': hash,
             'Content-Type': 'application/json',
           },
-          timeout: 5000,
+          timeout: Number(this.configService.get('API_TIMEOUT')) || 5000,
         },
       );
 
-      console.log('Received response:', response.data);
-
       if (response.data.success) {
-        // Deduct money from sender's account
+        // Deduct money from sender's account including fee if sender pays
         await this.accountModel.findByIdAndUpdate(senderAccount._id, {
           $inc: { balance: -totalAmount },
         });
 
-        // Update transaction status
+        // Update transaction status with fee details
         const updatedTransaction =
           await this.transactionModel.findByIdAndUpdate(
             transaction._id,
@@ -346,6 +400,13 @@ export class TransactionService {
         HttpStatus.BAD_REQUEST,
       );
     } catch (error) {
+      console.error('External transfer error details:', {
+        error: error.message,
+        code: error.code,
+        response: error.response?.data,
+        config: error.config,
+      });
+      // ...existing error handling code...
       console.error(
         'External transfer error:',
         error.response?.data || error.message,
@@ -426,52 +487,117 @@ export class TransactionService {
     return { transactionId: transaction.id };
   }
 
+  async getExternalAccountInfo(accountNumber: string) {
+    try {
+      // Generate request timestamp
+      const timestamp = new Date().toISOString();
+
+      // Get partner bank details first
+      const partnerBank = await this.bankModel.findOne({
+        code: this.configService.get('BANK_CODE'),
+      });
+
+      if (!partnerBank) {
+        throw new NotFoundException('Partner bank configuration not found');
+      }
+
+      // Create hash data in correct format
+      const dataToHash = {
+        accountNumber,
+        timestamp,
+      };
+
+      // Generate hash
+      const hash = this.cryptoUtil.generateAPIHash(
+        dataToHash,
+        timestamp,
+        partnerBank.secretKey,
+      );
+
+      console.log('Request details:', {
+        url: `${this.configService.get('EXTERNAL_BANK_API_URL')}/external/account-info`,
+        params: { accountNumber },
+        headers: {
+          'Partner-Code': this.configService.get('BANK_CODE'),
+          'Request-Time': timestamp,
+          'X-Hash': hash,
+        },
+      });
+
+      const response = await axios.get(
+        `${this.configService.get('EXTERNAL_BANK_API_URL')}/external/account-info`,
+        {
+          params: { accountNumber },
+          headers: {
+            'Partner-Code': this.configService.get('BANK_CODE'),
+            'Request-Time': timestamp,
+            'X-Hash': hash,
+            'Content-Type': 'application/json',
+          },
+          timeout: Number(this.configService.get('API_TIMEOUT')) || 5000,
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error('External account info error:', error);
+
+      if (axios.isAxiosError(error)) {
+        console.log('Response data:', error.response?.data);
+        const status = error.response?.status || HttpStatus.SERVICE_UNAVAILABLE;
+        const message =
+          error.response?.data?.message || 'Failed to get account info';
+        throw new HttpException(message, status);
+      }
+
+      throw new HttpException(
+        'Failed to connect to partner bank',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+  }
+
   async processIncomingExternalTransfer(
     transferDto: ExternalTransferReceiveDto,
   ) {
     try {
-      // Decrypt the incoming data
-      const decryptedData = this.rsaUtil.decryptWithPrivateKey(
-        transferDto.encryptedData,
-      );
+      const partnerBank = await this.bankModel.findOne({
+        code: transferDto.partnerCode,
+      });
 
-      // Validate timestamp to prevent replay attacks
-      const timestamp = new Date(decryptedData.timestamp);
-      const now = new Date();
-      if (now.getTime() - timestamp.getTime() > 5 * 60 * 1000) {
-        // 5 minutes
-        throw new HttpException('Request expired', HttpStatus.BAD_REQUEST);
+      if (!partnerBank) {
+        throw new HttpException('Unknown partner bank', HttpStatus.FORBIDDEN);
       }
 
-      const sourceBank = await this.bankModel.findById(
-        decryptedData.sourceBankId,
+      const decodedData = this.cryptoUtil.decodeTransactionData(
+        transferDto.encodedData,
+        partnerBank.publicKey,
+        partnerBank.secretKey,
       );
-      if (!sourceBank) {
-        throw new HttpException('Source bank not found', HttpStatus.NOT_FOUND);
-      }
 
+      // Continue with existing transfer logic using decodedData
       const account = await this.accountModel.findOne({
-        accountNumber: decryptedData.toAccount,
+        accountNumber: decodedData.toAccount,
       });
       if (!account) {
         throw new HttpException('Account not found', HttpStatus.NOT_FOUND);
       }
 
       const transaction = new this.transactionModel({
-        fromBank: sourceBank._id,
-        fromAccount: decryptedData.fromAccount,
-        toAccount: decryptedData.toAccount,
-        amount: decryptedData.amount,
-        content: decryptedData.content,
+        fromBank: partnerBank._id,
+        fromAccount: decodedData.fromAccount,
+        toAccount: decodedData.toAccount,
+        amount: decodedData.amount,
+        content: decodedData.content,
         type: 'external_receive',
         status: 'completed',
-        feeType: decryptedData.feeType,
-        fee: decryptedData.fee,
+        feeType: decodedData.feeType,
+        fee: decodedData.fee,
       });
 
       await transaction.save();
 
-      account.balance += decryptedData.amount;
+      account.balance += decodedData.amount;
       await account.save();
 
       return { success: true };
