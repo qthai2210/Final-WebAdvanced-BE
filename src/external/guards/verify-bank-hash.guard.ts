@@ -34,15 +34,16 @@ export class VerifyBankHashGuard implements CanActivate {
     }
 
     // Create hash data based on request method
-    let dataToHash;
-    if (request.method === 'GET') {
-      dataToHash = {
-        accountNumber: request.query.accountNumber,
-        //timestamp,
-      };
-    } else {
-      dataToHash = request.body;
-    }
+    const dataToHash = request.body;
+    // if (request.method === 'GET') {
+    //   dataToHash = {
+    //     accountNumber: request.query.accountNumber,
+    //     //timestamp,
+    //   };
+    // } else {
+    //   dataToHash = request.body;
+    // }
+
     console.log('Data to hash1:', dataToHash);
     console.log('Timestamp:', timestamp);
     console.log('Secret key:', bank.secretKey);
