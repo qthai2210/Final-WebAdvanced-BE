@@ -6,8 +6,6 @@ import {
   UseGuards,
   Query,
   Req,
-  Res,
-  Header,
   UseInterceptors,
 } from '@nestjs/common';
 import { ExternalService } from './external.service';
@@ -23,7 +21,6 @@ import { VerifyBankSignatureGuard } from './guards/verify-bank-signature.guard';
 import { VerifyBankHashGuard } from './guards/verify-bank-hash.guard';
 import { CryptoUtil } from 'src/utils/crypto.util';
 import { ConfigService } from '@nestjs/config';
-import { Response } from 'express';
 import { SignatureResponseInterceptor } from './interceptors/signature-response.interceptor';
 
 @ApiTags('External Bank Operations')
