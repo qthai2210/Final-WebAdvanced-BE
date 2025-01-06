@@ -143,7 +143,9 @@ export class ExternalService {
       account.balance += decodedData.amount;
       await account.save();
 
-      return { success: true };
+      return {
+        success: true,
+      };
     } catch (error) {
       console.error('Transfer processing error:', {
         error: error.message,
