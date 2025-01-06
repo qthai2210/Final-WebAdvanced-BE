@@ -306,19 +306,19 @@ export class TransactionService {
       });
 
       // Encode the transaction data with signature and hash
-      const encodedData = this.cryptoUtil.encodeTransactionData(
-        transferData,
-        this.configService.get('BANK_PRIVATE_KEY'),
-        partnerBank.secretKey,
-      );
+      // const encodedData = this.cryptoUtil.encodeTransactionData(
+      //   transferData,
+      //   this.configService.get('BANK_PRIVATE_KEY'),
+      //   partnerBank.secretKey,
+      // );
 
       // Generate request timestamp
       const timestamp = new Date().toISOString();
 
-      // Create request payload with partnerCode
+      // Create request payload with partnerCode and stringified transferData
       const requestPayload = {
-        partnerCode: this.configService.get('BANK_CODE'),
-        encodedData,
+        partnerCode: partnerBank.code,
+        transferData: JSON.stringify(transferData), // Convert data to string as expected
       };
 
       // Generate hash for request
@@ -344,10 +344,10 @@ export class TransactionService {
       // Make API call with security headers
       console.log('Calling partner bank API:', {
         url: `${partnerBank.apiUrl}/external/receive-transfer`,
-        bankCode: this.configService.get('BANK_CODE'),
+        bankCode: partnerBank.code,
         timestamp,
         headers: {
-          'Partner-Code': this.configService.get('BANK_CODE'),
+          'Partner-Code': partnerBank.code,
           'Request-Time': timestamp,
           'X-Hash': hash,
           'X-Signature': signature,
@@ -357,11 +357,11 @@ export class TransactionService {
       console.log('Request payload:', requestPayload);
 
       const response = await axios.post(
-        `${this.configService.get('EXTERNAL_BANK_API_URL')}/external/receive-transfer`, // Sửa URL từ configService
-        requestPayload,
+        `${partnerBank.apiUrl}/external/receive-transfer`, // Sửa URL từ configService
+        requestPayload, // Gửi payload dưới dạng object
         {
           headers: {
-            'Partner-Code': this.configService.get('BANK_CODE'),
+            'Partner-Code': partnerBank.code,
             'Request-Time': timestamp,
             'X-Signature': signature,
             'X-Hash': hash,
@@ -487,15 +487,17 @@ export class TransactionService {
     return { transactionId: transaction.id };
   }
 
-  async getExternalAccountInfo(accountNumber: string) {
+  async getExternalAccountInfo(accountNumber: string, bankId: string) {
     try {
       // Generate request timestamp
       const timestamp = new Date().toISOString();
 
+      const partnerBank = await this.bankModel.findById(bankId);
+
       // Get partner bank details first
-      const partnerBank = await this.bankModel.findOne({
-        code: this.configService.get('BANK_CODE'),
-      });
+      // const partnerBank = await this.bankModel.findOne({
+      //   code: ,
+      // });
 
       if (!partnerBank) {
         throw new NotFoundException('Partner bank configuration not found');
@@ -515,21 +517,21 @@ export class TransactionService {
       );
 
       console.log('Request details:', {
-        url: `${this.configService.get('EXTERNAL_BANK_API_URL')}/external/account-info`,
+        url: `${partnerBank.apiUrl}/external/account-info`,
         params: { accountNumber },
         headers: {
-          'Partner-Code': this.configService.get('BANK_CODE'),
+          'Partner-Code': partnerBank.code,
           'Request-Time': timestamp,
           'X-Hash': hash,
         },
       });
 
       const response = await axios.get(
-        `${this.configService.get('EXTERNAL_BANK_API_URL')}/external/account-info`,
+        `${partnerBank.apiUrl}/external/account-info`,
         {
           params: { accountNumber },
           headers: {
-            'Partner-Code': this.configService.get('BANK_CODE'),
+            'Partner-Code': partnerBank.code,
             'Request-Time': timestamp,
             'X-Hash': hash,
             'Content-Type': 'application/json',
@@ -571,8 +573,8 @@ export class TransactionService {
 
       const decodedData = this.cryptoUtil.decodeTransactionData(
         transferDto.encodedData,
-        partnerBank.publicKey,
-        partnerBank.secretKey,
+        //partnerBank.publicKey,
+        //partnerBank.secretKey,
       );
 
       // Continue with existing transfer logic using decodedData

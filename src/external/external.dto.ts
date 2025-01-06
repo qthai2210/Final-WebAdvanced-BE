@@ -15,5 +15,5 @@ export class ExternalTransferReceiveDto {
   })
   @IsString()
   @IsNotEmpty()
-  encodedData: string;
+  transferData: string;
 }

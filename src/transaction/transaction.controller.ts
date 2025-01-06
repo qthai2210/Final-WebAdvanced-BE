@@ -106,8 +106,14 @@ export class TransactionController {
   @Roles(UserRole.CUSTOMER)
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Get external account information' })
-  async getExternalAccountInfo(@Query('accountNumber') accountNumber: string) {
-    return this.transactionService.getExternalAccountInfo(accountNumber);
+  async getExternalAccountInfo(
+    @Query('accountNumber') accountNumber: string,
+    @Query('bankId') bankId: string,
+  ) {
+    return this.transactionService.getExternalAccountInfo(
+      accountNumber,
+      bankId,
+    );
   }
 
   @Post('external-transfer/receive')

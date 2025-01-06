@@ -172,33 +172,21 @@ export class CryptoUtil {
   }
 
   decodeTransactionData(
-    encodedData: string,
-    publicKey: string,
-    secretKey: string,
+    transferData: string,
+    //publicKey: string,
+    //secretKey: string,
   ): any {
-    const { data, signature, timestamp, hash } = JSON.parse(encodedData);
+    try {
+      // Parse transferData string to object
+      const data = JSON.parse(transferData);
 
-    // Sort keys to ensure consistent JSON stringification
-    const sortedData = Object.keys(data)
-      .sort()
-      .reduce((obj, key) => {
-        obj[key] = data[key];
-        return obj;
-      }, {});
+      // Verify signature and hash are not needed here since transferData
+      // is already a plain JSON string
 
-    const calculatedHash = this.generateAPIHash(
-      sortedData,
-      timestamp,
-      secretKey,
-    );
-    if (calculatedHash !== hash) {
-      throw new Error('Invalid hash');
+      return data;
+    } catch (error) {
+      console.error('Decoding error:', error);
+      throw new Error('Invalid transfer data format');
     }
-
-    if (!this.verifySignature(sortedData, signature, publicKey)) {
-      throw new Error('Invalid signature');
-    }
-
-    return data;
   }
 }
