@@ -27,11 +27,24 @@ export class ExternalService {
   ) {}
 
   async getInfo(accountNumber: string) {
-    const account = await this.accountModel.findOne({ accountNumber });
+    const account = await this.accountModel
+      .findOne({ accountNumber })
+      .populate('userId', ['username', 'email', 'fullName']) // Chỉ định các trường muốn lấy từ User
+      .exec();
+
     if (!account) {
       throw new HttpException('Account not found', HttpStatus.NOT_FOUND);
     }
-    return account;
+
+    // Transform response data if needed
+    const response = {
+      accountNumber: account.accountNumber,
+      username: account.userId?.username,
+      fullName: account.userId?.fullName,
+      email: account.userId?.email,
+    };
+
+    return response;
   }
 
   async processIncomingExternalTransfer(
