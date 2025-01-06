@@ -23,7 +23,7 @@ export class EmployeeService {
     @InjectModel(User.name) private userModel: Model<User>,
     private JWTUtil: JwtUtil,
     private readonly accountsService: AccountsService,
-  ) { }
+  ) {}
 
   async getTransactionHistory(query: TransactionHistoryQueryDto): Promise<any> {
     const {

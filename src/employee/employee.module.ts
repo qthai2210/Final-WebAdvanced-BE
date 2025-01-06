@@ -30,4 +30,4 @@ import {
   controllers: [EmployeeController],
   providers: [EmployeeService],
 })
-export class EmployeeModule { }
+export class EmployeeModule {}

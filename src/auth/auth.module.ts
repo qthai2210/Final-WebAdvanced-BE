@@ -12,12 +12,18 @@ import { AccountsModule } from 'src/accounts/accounts.module';
 import { AdminEmployeeController } from './admin/admin-employee.controller';
 import { LoggingModule } from '../logging/logging.module';
 import { LoggingInterceptor } from '../logging/logging.interceptor';
+import { TransactionModule } from 'src/transaction/transaction.module';
+import {
+  Transaction,
+  TransactionSchema,
+} from 'src/models/transactions/schemas/transaction.schema';
 
 @Module({
   imports: [
     MailModule,
     PassportModule,
     AccountsModule,
+    TransactionModule,
     JwtModule.registerAsync({
       useFactory: (configService: ConfigService) => ({
         secret: configService.get<string>('JWT_SECRET'),
@@ -25,7 +31,10 @@ import { LoggingInterceptor } from '../logging/logging.interceptor';
       }),
       inject: [ConfigService],
     }),
-    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+    MongooseModule.forFeature([
+      { name: User.name, schema: UserSchema },
+      { name: Transaction.name, schema: TransactionSchema },
+    ]),
     LoggingModule,
   ],
   providers: [

@@ -28,6 +28,9 @@ import { Roles } from '../decorators/roles.decorator';
 import { CreateEmployeeDto } from '../dto/create-employee.dto';
 import { createSuccessResponse } from 'src/ApiRespose/interface/response.interface';
 import { EmployeeFilterDto } from '../dto/employee-filter.dto';
+import { TransactionService } from 'src/transaction/transaction.service';
+import { ReconciliationResponseDto } from 'src/transaction/dto/reconciliation-response.dto';
+import { ReconciliationQueryDto } from 'src/transaction/dto/reconciliation-query.dto';
 
 @ApiTags('Admin - Employees')
 @Controller('admin/employees')
@@ -40,7 +43,10 @@ import { EmployeeFilterDto } from '../dto/employee-filter.dto';
 //   required: true,
 // })
 export class AdminEmployeeController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly transactionService: TransactionService,
+  ) {}
 
   @Get('validate-token')
   @ApiOperation({ summary: 'Validate JWT token' })
@@ -50,6 +56,19 @@ export class AdminEmployeeController {
       valid: true,
       token: auth?.replace('Bearer ', ''),
     };
+  }
+
+  @Get('reconciliation')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get reconciliation report with partner banks' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns reconciliation report',
+    type: ReconciliationResponseDto,
+  })
+  async getReconciliation(@Query() query: ReconciliationQueryDto) {
+    return this.transactionService.getReconciliationReport(query);
   }
 
   @Post()

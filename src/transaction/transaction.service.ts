@@ -7,7 +7,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Transaction } from '../models/transactions/schemas/transaction.schema';
 import {
   TransactionHistoryQueryDto,
@@ -29,6 +29,8 @@ import axios from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { RsaUtil } from '../utils/rsa.util';
 import { CryptoUtil } from '../utils/crypto.util';
+import { ReconciliationQueryDto } from './dto/reconciliation-query.dto';
+import { ReconciliationResponseDto } from './dto/reconciliation-response.dto';
 
 @Injectable()
 export class TransactionService {
@@ -609,4 +611,114 @@ export class TransactionService {
   //     );
   //   }
   // }
+
+  async getReconciliationReport(
+    query: ReconciliationQueryDto,
+  ): Promise<ReconciliationResponseDto> {
+    console.log('Query', query);
+    try {
+      const matchQuery: any = {
+        createdAt: {
+          $gte: new Date(query.fromDate),
+          $lte: new Date(query.toDate),
+        },
+        status: 'completed',
+        $or: [{ type: 'external_transfer' }, { type: 'external_receive' }],
+      };
+
+      // Convert bankId từ string sang ObjectId nếu có
+      if (query.bankId) {
+        const bankObjectId = new Types.ObjectId(query.bankId);
+        matchQuery.$or = [
+          { bankId: bankObjectId },
+          { fromBankId: bankObjectId },
+          { toBankId: bankObjectId },
+        ];
+      }
+
+      const transactions = await this.transactionModel
+        .aggregate([
+          { $match: matchQuery },
+          {
+            $lookup: {
+              from: 'banks',
+              localField: 'bankId',
+              foreignField: '_id',
+              as: 'bank',
+            },
+          },
+          {
+            $group: {
+              _id: {
+                bankId: { $ifNull: ['$bankId', '$fromBankId'] },
+              },
+              sent: {
+                $sum: {
+                  $cond: [
+                    { $eq: ['$type', 'external_transfer'] },
+                    '$amount',
+                    0,
+                  ],
+                },
+              },
+              received: {
+                $sum: {
+                  $cond: [{ $eq: ['$type', 'external_receive'] }, '$amount', 0],
+                },
+              },
+              count: { $sum: 1 },
+              transactions: { $push: '$$ROOT' },
+            },
+          },
+        ])
+        .exec();
+
+      const banksData = await Promise.all(
+        transactions.map(async (group) => {
+          const bank = await this.bankModel.findById(group._id.bankId);
+          return {
+            bankName: bank?.name || 'Unknown Bank',
+            bankId: group._id.bankId,
+            totalReceived: group.received,
+            totalSent: group.sent,
+            transactionCount: group.count,
+            transactions: group.transactions.map((t) => ({
+              id: t._id,
+              type: t.type === 'external_transfer' ? 'sent' : 'received',
+              amount: t.amount,
+              fromAccount: t.fromAccount,
+              toAccount: t.toAccount,
+              content: t.content,
+              createdAt: t.createdAt,
+              status: t.status,
+            })),
+          };
+        }),
+      );
+
+      return {
+        totalAmount: banksData.reduce(
+          (sum, bank) => sum + bank.totalReceived + bank.totalSent,
+          0,
+        ),
+        totalTransactions: banksData.reduce(
+          (sum, bank) => sum + bank.transactionCount,
+          0,
+        ),
+        banks: banksData,
+      };
+    } catch (error) {
+      console.error('Reconciliation error:', error);
+      if (error.name === 'BSONTypeError') {
+        throw new HttpException(
+          'Invalid bank ID format',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      throw new HttpException(
+        'Failed to generate reconciliation report',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 }
