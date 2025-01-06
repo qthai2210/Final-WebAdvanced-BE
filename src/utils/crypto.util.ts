@@ -142,7 +142,7 @@ export class CryptoUtil {
 
       const formattedKey = this.formatKey(publicKey, false);
 
-      return verify.verify(formattedKey, Buffer.from(signature, 'base64'));
+      return verify.verify(formattedKey, signature, 'base64');
     } catch (error) {
       console.error('Verification error:', error);
       throw new Error(`Failed to verify signature: ${error.message}`);
