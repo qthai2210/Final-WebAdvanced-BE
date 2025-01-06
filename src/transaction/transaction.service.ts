@@ -15,7 +15,6 @@ import {
 } from './dto/transaction-history.dto';
 import {
   ExternalTransferDto,
-  ExternalTransferReceiveDto,
   InternalTransferDto,
 } from './dto/transaction-create.dto';
 import { Account } from 'src/models/accounts/schemas/account.schema';
@@ -317,7 +316,6 @@ export class TransactionService {
 
       // Create request payload with partnerCode and stringified transferData
       const requestPayload = {
-        partnerCode: partnerBank.code,
         transferData: JSON.stringify(transferData), // Convert data to string as expected
       };
 
@@ -347,10 +345,10 @@ export class TransactionService {
         bankCode: partnerBank.code,
         timestamp,
         headers: {
-          'Partner-Code': partnerBank.code,
-          'Request-Time': timestamp,
-          'X-Hash': hash,
-          'X-Signature': signature,
+          'x-bank-code': this.configService.get('BANK_CODE'),
+          'x-timestamp': timestamp,
+          'x-hash': hash,
+          'x-signature': signature,
         },
       });
 
@@ -361,10 +359,10 @@ export class TransactionService {
         requestPayload, // Gửi payload dưới dạng object
         {
           headers: {
-            'Partner-Code': partnerBank.code,
-            'Request-Time': timestamp,
-            'X-Signature': signature,
-            'X-Hash': hash,
+            'x-bank-code': this.configService.get('BANK_CODE'),
+            'x-timestamp': timestamp,
+            'x-signature': signature,
+            'x-hash': hash,
             'Content-Type': 'application/json',
           },
           timeout: Number(this.configService.get('API_TIMEOUT')) || 5000,
@@ -506,7 +504,7 @@ export class TransactionService {
       // Create hash data in correct format
       const dataToHash = {
         accountNumber,
-        timestamp,
+        //  timestamp,
       };
 
       // Generate hash
@@ -520,8 +518,8 @@ export class TransactionService {
         url: `${partnerBank.apiUrl}/external/account-info`,
         params: { accountNumber },
         headers: {
-          'Partner-Code': partnerBank.code,
-          'Request-Time': timestamp,
+          'x-bank-code': this.configService.get('BANK_CODE'),
+          'x-timestamp': timestamp,
           'X-Hash': hash,
         },
       });
@@ -531,8 +529,8 @@ export class TransactionService {
         {
           params: { accountNumber },
           headers: {
-            'Partner-Code': partnerBank.code,
-            'Request-Time': timestamp,
+            'x-bank-code': this.configService.get('BANK_CODE'),
+            'x-timestamp': timestamp,
             'X-Hash': hash,
             'Content-Type': 'application/json',
           },
@@ -559,56 +557,56 @@ export class TransactionService {
     }
   }
 
-  async processIncomingExternalTransfer(
-    transferDto: ExternalTransferReceiveDto,
-  ) {
-    try {
-      const partnerBank = await this.bankModel.findOne({
-        code: transferDto.partnerCode,
-      });
+  // async processIncomingExternalTransfer(
+  //   transferDto: ExternalTransferReceiveDto,
+  // ) {
+  //   try {
+  //     const partnerBank = await this.bankModel.findOne({
+  //       code: transferDto.partnerCode,
+  //     });
 
-      if (!partnerBank) {
-        throw new HttpException('Unknown partner bank', HttpStatus.FORBIDDEN);
-      }
+  //     if (!partnerBank) {
+  //       throw new HttpException('Unknown partner bank', HttpStatus.FORBIDDEN);
+  //     }
 
-      const decodedData = this.cryptoUtil.decodeTransactionData(
-        transferDto.encodedData,
-        //partnerBank.publicKey,
-        //partnerBank.secretKey,
-      );
+  //     const decodedData = this.cryptoUtil.decodeTransactionData(
+  //       transferDto.encodedData,
+  //       //partnerBank.publicKey,
+  //       //partnerBank.secretKey,
+  //     );
 
-      // Continue with existing transfer logic using decodedData
-      const account = await this.accountModel.findOne({
-        accountNumber: decodedData.toAccount,
-      });
-      if (!account) {
-        throw new HttpException('Account not found', HttpStatus.NOT_FOUND);
-      }
+  //     // Continue with existing transfer logic using decodedData
+  //     const account = await this.accountModel.findOne({
+  //       accountNumber: decodedData.toAccount,
+  //     });
+  //     if (!account) {
+  //       throw new HttpException('Account not found', HttpStatus.NOT_FOUND);
+  //     }
 
-      const transaction = new this.transactionModel({
-        fromBank: partnerBank._id,
-        fromAccount: decodedData.fromAccount,
-        toAccount: decodedData.toAccount,
-        amount: decodedData.amount,
-        content: decodedData.content,
-        type: 'external_receive',
-        status: 'completed',
-        feeType: decodedData.feeType,
-        fee: decodedData.fee,
-      });
+  //     const transaction = new this.transactionModel({
+  //       fromBank: partnerBank._id,
+  //       fromAccount: decodedData.fromAccount,
+  //       toAccount: decodedData.toAccount,
+  //       amount: decodedData.amount,
+  //       content: decodedData.content,
+  //       type: 'external_receive',
+  //       status: 'completed',
+  //       feeType: decodedData.feeType,
+  //       fee: decodedData.fee,
+  //     });
 
-      await transaction.save();
+  //     await transaction.save();
 
-      account.balance += decodedData.amount;
-      await account.save();
+  //     account.balance += decodedData.amount;
+  //     await account.save();
 
-      return { success: true };
-    } catch (error) {
-      console.error('Decryption error:', error);
-      throw new HttpException(
-        'Failed to process encrypted transfer',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-  }
+  //     return { success: true };
+  //   } catch (error) {
+  //     console.error('Decryption error:', error);
+  //     throw new HttpException(
+  //       'Failed to process encrypted transfer',
+  //       HttpStatus.BAD_REQUEST,
+  //     );
+  //   }
+  // }
 }

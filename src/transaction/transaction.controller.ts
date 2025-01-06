@@ -13,7 +13,6 @@ import {
 import {
   InternalTransferDto,
   ExternalTransferDto,
-  ExternalTransferReceiveDto,
 } from './dto/transaction-create.dto';
 import { BearerToken } from 'src/auth/decorators/auth.decorator';
 import { VerifyOtpTransactionDto } from './dto/verify-otp.dto';
@@ -116,11 +115,11 @@ export class TransactionController {
     );
   }
 
-  @Post('external-transfer/receive')
-  @ApiOperation({ summary: 'Receive transfer from other bank' })
-  async receiveExternalTransfer(
-    @Body() transferDto: ExternalTransferReceiveDto,
-  ) {
-    return this.transactionService.processIncomingExternalTransfer(transferDto);
-  }
+  // @Post('external-transfer/receive')
+  // @ApiOperation({ summary: 'Receive transfer from other bank' })
+  // async receiveExternalTransfer(
+  //   @Body() transferDto: ExternalTransferReceiveDto,
+  // ) {
+  //   return this.transactionService.processIncomingExternalTransfer(transferDto);
+  // }
 }

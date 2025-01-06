@@ -26,7 +26,6 @@ import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { RolesGuard } from '../guards/roles.guard';
 import { Roles } from '../decorators/roles.decorator';
 import { CreateEmployeeDto } from '../dto/create-employee.dto';
-import { PaginationDto } from '../dto/pagination.dto';
 import { createSuccessResponse } from 'src/ApiRespose/interface/response.interface';
 import { EmployeeFilterDto } from '../dto/employee-filter.dto';
 

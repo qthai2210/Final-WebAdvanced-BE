@@ -36,79 +36,75 @@ export class ExternalService {
 
   async processIncomingExternalTransfer(
     transferDto: ExternalTransferReceiveDto,
-    headers: Record<string, string>,
+    bank: any,
   ) {
     try {
-      const partnerBank = await this.bankModel.findOne({
-        code: transferDto.partnerCode,
-      });
+      // const partnerBank = await this.bankModel.findOne({
+      //   code: headers['x-bank-code'],
+      // });
 
-      if (!partnerBank) {
-        throw new HttpException('Unknown partner bank', HttpStatus.FORBIDDEN);
-      }
+      // if (!partnerBank) {
+      //   throw new HttpException('Unknown partner bank', HttpStatus.FORBIDDEN);
+      // }
 
       // Validate request timestamp from header
-      const requestTime = headers['request-time'];
-      const signature = headers['x-signature'];
-      const receivedHash = headers['x-hash'];
+      // const requestTime = headers['x-timestamp'];
+      // const signature = headers['x-signature'];
+      // const receivedHash = headers['x-hash'];
 
-      if (!requestTime || !signature || !receivedHash) {
-        throw new HttpException(
-          'Missing required headers',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
+      // if (!requestTime || !signature || !receivedHash) {
+      //   throw new HttpException(
+      //     'Missing required headers',
+      //     HttpStatus.BAD_REQUEST,
+      //   );
+      // }
+      // // Verify timestamp
+      // const timestamp = new Date(requestTime);
+      // const now = new Date();
+      // if (now.getTime() - timestamp.getTime() > 5 * 60 * 1000) {
+      //   throw new HttpException('Request expired', HttpStatus.BAD_REQUEST);
+      // }
 
-      // Verify timestamp
-      const timestamp = new Date(requestTime);
-      const now = new Date();
-      if (now.getTime() - timestamp.getTime() > 5 * 60 * 1000) {
-        throw new HttpException('Request expired', HttpStatus.BAD_REQUEST);
-      }
+      // // Verify hash of data
+      // const requestPayload = {
+      //   //partnerCode: transferDto.partnerCode,
+      //   transferData: transferDto.transferData,
+      // };
+      // console.log('Request payload1:', requestPayload);
+      // console.log('requestTime:', requestTime);
+      // console.log('partnerBank.secretKey:', partnerBank.secretKey);
 
-      // Verify hash of data
-      const requestPayload = {
-        partnerCode: transferDto.partnerCode,
-        transferData: transferDto.transferData,
-      };
-
-      const calculatedHash = this.cryptoUtil.generateAPIHash(
-        requestPayload, // Sửa lại dùng requestPayload thay vì transferDto
-        requestTime,
-        partnerBank.secretKey,
-      );
-
-      if (calculatedHash !== receivedHash) {
-        throw new HttpException('Invalid hash', HttpStatus.FORBIDDEN);
-      }
+      // const calculatedHash = this.cryptoUtil.generateAPIHash(
+      //   requestPayload, // Sửa lại dùng requestPayload thay vì transferDto
+      //   requestTime,
+      //   partnerBank.secretKey,
+      // );
+      // console.log('Calculated hash:', calculatedHash);
+      // console.log('Received hash:', receivedHash);
+      // if (calculatedHash !== receivedHash) {
+      //   throw new HttpException('Invalid hash', HttpStatus.FORBIDDEN);
+      // }
 
       // Verify signature of transfer data
-      const isValidSignature = this.cryptoUtil.verifySignature(
-        requestPayload, // Verify entire payload
-        signature,
-        partnerBank.publicKey,
-      );
+      // const isValidSignature = this.cryptoUtil.verifySignature(
+      //   requestPayload, // Verify entire payload
+      //   signature,
+      //   partnerBank.publicKey,
+      // );
 
-      if (!isValidSignature) {
-        console.error('Signature verification failed:', {
-          receivedSignature: signature,
-          payload: requestPayload,
-          publicKey: partnerBank.publicKey.substring(0, 100) + '...',
-        });
-        throw new HttpException('Invalid signature', HttpStatus.FORBIDDEN);
-      }
+      // if (!isValidSignature) {
+      //   console.error('Signature verification failed:', {
+      //     receivedSignature: signature,
+      //     payload: requestPayload,
+      //     publicKey: partnerBank.publicKey.substring(0, 100) + '...',
+      //   });
+      //   throw new HttpException('Invalid signature', HttpStatus.FORBIDDEN);
+      // }
 
       // Decode and process transfer data
-      const decodedData = this.cryptoUtil.decodeTransactionData(
-        transferDto.transferData,
-      );
+      const decodedData = JSON.parse(transferDto.transferData);
 
-      const sourceBank = await this.bankModel.findById(
-        decodedData.sourceBankId,
-      );
-      if (!sourceBank) {
-        throw new HttpException('Source bank not found', HttpStatus.NOT_FOUND);
-      }
+      const sourceBank = bank;
 
       const account = await this.accountModel.findOne({
         accountNumber: decodedData.toAccount,

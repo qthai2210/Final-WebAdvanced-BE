@@ -19,7 +19,7 @@ export class VerifyBankSignatureGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const signature = request.headers['x-signature'];
-    const partnerCode = request.headers['partner-code'];
+    const partnerCode = request.headers['x-bank-code'];
 
     if (!signature || !partnerCode) {
       throw new UnauthorizedException('Missing signature or partner code');
