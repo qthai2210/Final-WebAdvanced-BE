@@ -105,7 +105,7 @@ export class ExternalService {
       const decodedData = JSON.parse(transferDto.transferData);
 
       const sourceBank = bank;
-
+      console.log('Source bank:', sourceBank);
       const account = await this.accountModel.findOne({
         accountNumber: decodedData.toAccount,
       });
@@ -114,7 +114,7 @@ export class ExternalService {
       }
 
       const transaction = new this.transactionModel({
-        fromBank: sourceBank._id,
+        fromBankId: sourceBank._id,
         fromAccount: decodedData.fromAccount,
         toAccount: decodedData.toAccount,
         amount: decodedData.amount,
