@@ -374,7 +374,25 @@ export class TransactionService {
       console.log('Response data:', response.data);
       console.log('Response header:', response.headers);
 
-      //response.data.headers =
+      // Get components used to generate signature from response
+      const responseSignature = response.headers['x-signature'];
+
+      // Recreate hash string that was signed
+      const hashString = `${timestamp}${signature}${hash}`;
+
+      // Verify the response signature
+      const isValidSignature = this.cryptoUtil.verifySignature(
+        hashString, // Use same hash string that was signed
+        responseSignature,
+        partnerBank.publicKey,
+      );
+
+      if (!isValidSignature) {
+        throw new HttpException(
+          'Invalid response signature',
+          HttpStatus.FORBIDDEN,
+        );
+      }
 
       if (response.data.success) {
         // Deduct money from sender's account including fee if sender pays
