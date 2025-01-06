@@ -19,10 +19,13 @@ export class VerifyBankSignatureGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const signature = request.headers['x-signature'];
+    const hash = request.headers['x-hash']; // Lấy hash từ header
     const partnerCode = request.headers['x-bank-code'];
 
-    if (!signature || !partnerCode) {
-      throw new UnauthorizedException('Missing signature or partner code');
+    if (!signature || !partnerCode || !hash) {
+      throw new UnauthorizedException(
+        'Missing signature, hash or partner code',
+      );
     }
 
     const bank = await this.bankModel.findOne({ code: partnerCode });
@@ -30,17 +33,16 @@ export class VerifyBankSignatureGuard implements CanActivate {
       throw new UnauthorizedException('Invalid bank partner configuration');
     }
 
-    // Add debug logging
     console.log('Verifying signature with:', {
-      partnerCode,
+      hash,
+      signature,
       publicKey: bank.publicKey.substring(0, 100) + '...',
-      requestBody: JSON.stringify(request.body).substring(0, 100) + '...',
-      signature: signature.substring(0, 50) + '...',
     });
 
     try {
+      // Verify signature với hash
       const isValid = this.cryptoUtil.verifySignature(
-        Headers['x-hash'],
+        hash, // Dùng hash thay vì request body
         signature,
         bank.publicKey,
       );
