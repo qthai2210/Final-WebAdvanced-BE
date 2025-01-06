@@ -371,6 +371,11 @@ export class TransactionService {
         },
       );
 
+      console.log('Response data:', response.data);
+      console.log('Response header:', response.headers);
+
+      //response.data.headers =
+
       if (response.data.success) {
         // Deduct money from sender's account including fee if sender pays
         await this.accountModel.findByIdAndUpdate(senderAccount._id, {

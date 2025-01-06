@@ -6,6 +6,9 @@ import {
   UseGuards,
   Query,
   Req,
+  Res,
+  Header,
+  UseInterceptors,
 } from '@nestjs/common';
 import { ExternalService } from './external.service';
 import {
@@ -20,6 +23,8 @@ import { VerifyBankSignatureGuard } from './guards/verify-bank-signature.guard';
 import { VerifyBankHashGuard } from './guards/verify-bank-hash.guard';
 import { CryptoUtil } from 'src/utils/crypto.util';
 import { ConfigService } from '@nestjs/config';
+import { Response } from 'express';
+import { SignatureResponseInterceptor } from './interceptors/signature-response.interceptor';
 
 @ApiTags('External Bank Operations')
 @Controller('external')
@@ -32,6 +37,7 @@ export class ExternalController {
 
   @Post('receive-transfer')
   @UseGuards(VerifyBankSignatureGuard, VerifyBankHashGuard) // Kiểm tra ở đây trước
+  @UseInterceptors(SignatureResponseInterceptor)
   @ApiOperation({ summary: 'Receive transfer from other bank' })
   @ApiHeader({ name: 'x-bank-code', required: true })
   @ApiHeader({ name: 'x-timestamp', required: true })
@@ -45,27 +51,11 @@ export class ExternalController {
     @Req() request,
   ) {
     const bank = request.partner;
-    const headers = request.headers;
-    const requestTime = headers['x-timestamp'];
-    const signature = headers['x-signature'];
-    const receivedHash = headers['x-hash'];
-    const hash = `${requestTime}${signature}${receivedHash}`;
-    // Ký và gửi lại thông báo cho ngân hàng gốc
-    const signatureResponse = this.cryptoUtil.signData(
-      //requestPayload,
-      hash,
-      this.configService.get('BANK_PRIVATE_KEY'),
-    );
     const result = await this.externalService.processIncomingExternalTransfer(
       transferDto,
       bank,
     );
-    return {
-      ...result,
-      headers: {
-        'x-signature': signatureResponse,
-      },
-    };
+    return result;
   }
 
   @Get('account-info')
