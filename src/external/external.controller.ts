@@ -6,7 +6,6 @@ import {
   Headers,
   UseGuards,
   Query,
-  BadRequestException,
 } from '@nestjs/common';
 import { ExternalService } from './external.service';
 import {
@@ -26,7 +25,7 @@ export class ExternalController {
   constructor(private readonly externalService: ExternalService) {}
 
   @Post('receive-transfer')
-  @UseGuards(VerifyBankSignatureGuard, VerifyBankHashGuard)
+  @UseGuards(VerifyBankSignatureGuard, VerifyBankHashGuard) // Kiểm tra ở đây trước
   @ApiOperation({ summary: 'Receive transfer from other bank' })
   @ApiHeader({ name: 'Partner-Code', required: true })
   @ApiHeader({ name: 'Request-Time', required: true })
@@ -36,24 +35,13 @@ export class ExternalController {
   @ApiResponse({ status: 400, description: 'Bad request or invalid data' })
   @ApiResponse({ status: 403, description: 'Invalid signature or hash' })
   async receiveTransfer(
-    @Headers('Partner-Code') partnerCode: string,
-    @Headers('Request-Time') timestamp: string,
-    @Headers('X-Hash') hash: string,
-    @Headers('X-Signature') signature: string,
-    @Body() transferData: ExternalTransferReceiveDto,
+    @Body() transferDto: ExternalTransferReceiveDto,
+    @Headers() headers: Record<string, string>,
   ) {
-    // Ensure partnerCode matches between headers and body
-    if (partnerCode !== transferData.partnerCode) {
-      throw new BadRequestException('Partner code mismatch');
-    }
-
-    console.log('Received transfer request:', {
-      partnerCode,
-      headers: { timestamp, hash, signature },
-      body: transferData,
-    });
-
-    return this.externalService.processIncomingExternalTransfer(transferData);
+    return this.externalService.processIncomingExternalTransfer(
+      transferDto,
+      headers,
+    );
   }
 
   @Get('account-info')

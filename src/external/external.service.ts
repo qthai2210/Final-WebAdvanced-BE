@@ -36,6 +36,7 @@ export class ExternalService {
 
   async processIncomingExternalTransfer(
     transferDto: ExternalTransferReceiveDto,
+    headers: Record<string, string>,
   ) {
     try {
       const partnerBank = await this.bankModel.findOne({
@@ -46,26 +47,61 @@ export class ExternalService {
         throw new HttpException('Unknown partner bank', HttpStatus.FORBIDDEN);
       }
 
-      // Log the incoming data for debugging
-      console.log('Processing transfer with data:', {
-        partnerCode: transferDto.partnerCode,
-        encodedData: transferDto.encodedData, // Changed from encryptedData to encodedData
-      });
+      // Validate request timestamp from header
+      const requestTime = headers['request-time'];
+      const signature = headers['x-signature'];
+      const receivedHash = headers['x-hash'];
 
-      // Use encodedData instead of encryptedData
-      const decodedData = this.cryptoUtil.decodeTransactionData(
-        transferDto.encodedData,
-        partnerBank.publicKey,
+      if (!requestTime || !signature || !receivedHash) {
+        throw new HttpException(
+          'Missing required headers',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      // Verify timestamp
+      const timestamp = new Date(requestTime);
+      const now = new Date();
+      if (now.getTime() - timestamp.getTime() > 5 * 60 * 1000) {
+        throw new HttpException('Request expired', HttpStatus.BAD_REQUEST);
+      }
+
+      // Verify hash of data
+      const requestPayload = {
+        partnerCode: transferDto.partnerCode,
+        transferData: transferDto.transferData,
+      };
+
+      const calculatedHash = this.cryptoUtil.generateAPIHash(
+        requestPayload, // Sửa lại dùng requestPayload thay vì transferDto
+        requestTime,
         partnerBank.secretKey,
       );
 
-      // Validate timestamp to prevent replay attacks
-      const timestamp = new Date(decodedData.timestamp);
-      const now = new Date();
-      if (now.getTime() - timestamp.getTime() > 5 * 60 * 1000) {
-        // 5 minutes
-        throw new HttpException('Request expired', HttpStatus.BAD_REQUEST);
+      if (calculatedHash !== receivedHash) {
+        throw new HttpException('Invalid hash', HttpStatus.FORBIDDEN);
       }
+
+      // Verify signature of transfer data
+      const isValidSignature = this.cryptoUtil.verifySignature(
+        requestPayload, // Verify entire payload
+        signature,
+        partnerBank.publicKey,
+      );
+
+      if (!isValidSignature) {
+        console.error('Signature verification failed:', {
+          receivedSignature: signature,
+          payload: requestPayload,
+          publicKey: partnerBank.publicKey.substring(0, 100) + '...',
+        });
+        throw new HttpException('Invalid signature', HttpStatus.FORBIDDEN);
+      }
+
+      // Decode and process transfer data
+      const decodedData = this.cryptoUtil.decodeTransactionData(
+        transferDto.transferData,
+      );
 
       const sourceBank = await this.bankModel.findById(
         decodedData.sourceBankId,
