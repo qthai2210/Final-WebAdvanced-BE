@@ -4,6 +4,7 @@ import {
   ExecutionContext,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Bank } from 'src/models/banks/schemas/bank.schema';
@@ -14,6 +15,7 @@ export class VerifyBankHashGuard implements CanActivate {
   constructor(
     @InjectModel(Bank.name) private bankModel: Model<Bank>,
     private cryptoUtil: CryptoUtil,
+    private configService: ConfigService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -47,7 +49,7 @@ export class VerifyBankHashGuard implements CanActivate {
     const calculatedHash = this.cryptoUtil.generateAPIHash(
       dataToHash,
       timestamp,
-      bank.secretKey,
+      this.configService.get('BANK_SECRET_KEY'),
     );
 
     console.log('Hash verification:', {
