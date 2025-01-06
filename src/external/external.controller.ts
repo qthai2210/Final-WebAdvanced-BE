@@ -51,7 +51,7 @@ export class ExternalController {
   @ApiOperation({ summary: 'Get account information' })
   @ApiHeader({ name: 'x-bank-code', required: true })
   @ApiHeader({ name: 'x-timestamp', required: true })
-  @ApiHeader({ name: 'x-Hash', required: true })
+  @ApiHeader({ name: 'x-hash', required: true })
   @ApiQuery({ name: 'accountNumber', required: true, type: String })
   @ApiResponse({ status: 200, description: 'Account information retrieved' })
   @ApiResponse({ status: 404, description: 'Account not found' })

@@ -3,7 +3,6 @@ export interface TransferData {
   toAccount: string;
   amount: number;
   content: string;
-  sourceBankId: string;
   timestamp: string;
   fee: number;
   feeType: string;

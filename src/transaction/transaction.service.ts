@@ -286,7 +286,6 @@ export class TransactionService {
         toAccount: transaction.toAccount,
         amount: transaction.amount,
         content: transaction.content,
-        sourceBankId: this.configService.get('BANK_ID'),
         timestamp: new Date().toISOString(),
         fee: fee,
         feeType: transaction.feeType,
@@ -335,7 +334,8 @@ export class TransactionService {
 
       // Generate signature for request
       const signature = this.cryptoUtil.signData(
-        requestPayload,
+        //requestPayload,
+        hash,
         this.configService.get('BANK_PRIVATE_KEY'),
       );
 
@@ -520,7 +520,7 @@ export class TransactionService {
         headers: {
           'x-bank-code': this.configService.get('BANK_CODE'),
           'x-timestamp': timestamp,
-          'X-Hash': hash,
+          'x-hash': hash,
         },
       });
 
@@ -531,7 +531,7 @@ export class TransactionService {
           headers: {
             'x-bank-code': this.configService.get('BANK_CODE'),
             'x-timestamp': timestamp,
-            'X-Hash': hash,
+            'x-hash': hash,
             'Content-Type': 'application/json',
           },
           timeout: Number(this.configService.get('API_TIMEOUT')) || 5000,
