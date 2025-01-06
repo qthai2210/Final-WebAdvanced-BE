@@ -19,8 +19,8 @@ export class VerifyBankHashGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const hash = request.headers['x-hash'];
-    const timestamp = request.headers['request-time'];
-    const partnerCode = request.headers['partner-code'];
+    const timestamp = request.headers['x-timestamp'];
+    const partnerCode = request.headers['x-bank-code'];
 
     if (!hash || !timestamp || !partnerCode) {
       throw new UnauthorizedException('Missing required headers');
@@ -36,12 +36,14 @@ export class VerifyBankHashGuard implements CanActivate {
     if (request.method === 'GET') {
       dataToHash = {
         accountNumber: request.query.accountNumber,
-        timestamp,
+        //timestamp,
       };
     } else {
       dataToHash = request.body;
     }
-
+    console.log('Data to hash1:', dataToHash);
+    console.log('Timestamp:', timestamp);
+    console.log('Secret key:', bank.secretKey);
     const calculatedHash = this.cryptoUtil.generateAPIHash(
       dataToHash,
       timestamp,
@@ -66,6 +68,7 @@ export class VerifyBankHashGuard implements CanActivate {
     }
 
     request.partner = bank;
+    console.log('BankType:', typeof bank);
     return true;
   }
 }

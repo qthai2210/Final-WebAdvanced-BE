@@ -113,7 +113,7 @@ export class CryptoUtil {
 
   signData(data: any, privateKey: string): string {
     try {
-      const sign = crypto.createSign('SHA256');
+      const sign = crypto.createSign('RSA-SHA256');
       const dataString = typeof data === 'string' ? data : JSON.stringify(data);
       sign.update(dataString);
 
@@ -133,7 +133,7 @@ export class CryptoUtil {
 
   verifySignature(data: any, signature: string, publicKey: string): boolean {
     try {
-      const verify = crypto.createVerify('SHA256');
+      const verify = crypto.createVerify('RSA-SHA256');
       const dataString = typeof data === 'string' ? data : JSON.stringify(data);
       verify.update(dataString);
 
