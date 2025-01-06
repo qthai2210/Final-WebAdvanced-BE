@@ -111,11 +111,13 @@ export class CryptoUtil {
     }
   }
 
-  signData(data: any, privateKey: string): string {
+  signData(hash: string, privateKey: string): string {
     try {
       const sign = crypto.createSign('RSA-SHA256');
-      const dataString = typeof data === 'string' ? data : JSON.stringify(data);
-      sign.update(dataString);
+      // const dataString = typeof data === 'string' ? data : JSON.stringify(data);
+      // sign.update(dataString);
+
+      sign.update(hash);
 
       const formattedKey = this.formatKey(privateKey, true);
       console.log('Private key after cleanup:', formattedKey);
@@ -131,11 +133,12 @@ export class CryptoUtil {
     }
   }
 
-  verifySignature(data: any, signature: string, publicKey: string): boolean {
+  verifySignature(hash: string, signature: string, publicKey: string): boolean {
     try {
       const verify = crypto.createVerify('RSA-SHA256');
-      const dataString = typeof data === 'string' ? data : JSON.stringify(data);
-      verify.update(dataString);
+      // const dataString = typeof data === 'string' ? data : JSON.stringify(data);
+      // verify.update(dataString);
+      verify.update(hash);
 
       const formattedKey = this.formatKey(publicKey, false);
 
@@ -159,7 +162,7 @@ export class CryptoUtil {
         return obj;
       }, {});
 
-    const signature = this.signData(sortedTransaction, privateKey);
+    const signature = this.signData(sortedTransaction.toString(), privateKey);
     const timestamp = new Date().toISOString();
     const hash = this.generateAPIHash(sortedTransaction, timestamp, secretKey);
 

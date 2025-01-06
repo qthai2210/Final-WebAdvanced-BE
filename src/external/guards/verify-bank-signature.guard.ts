@@ -40,7 +40,7 @@ export class VerifyBankSignatureGuard implements CanActivate {
 
     try {
       const isValid = this.cryptoUtil.verifySignature(
-        request.body,
+        Headers['x-hash'],
         signature,
         bank.publicKey,
       );
