@@ -141,7 +141,10 @@ export class CryptoUtil {
       verify.update(hash);
 
       const formattedKey = this.formatKey(publicKey, false);
-
+      console.log('Public key after cleanup:', formattedKey);
+      // count number of lines of public key
+      const lines = formattedKey.split('\n').length;
+      console.log('Number of lines:', lines);
       return verify.verify(formattedKey, signature, 'base64');
     } catch (error) {
       console.error('Verification error:', error);
