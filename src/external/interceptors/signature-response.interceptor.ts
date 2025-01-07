@@ -32,8 +32,9 @@ export class SignatureResponseInterceptor implements NestInterceptor {
           hash,
           this.configService.get('BANK_PRIVATE_KEY'),
         );
-
+        console.log('Signature response123:', signatureResponse);
         response.setHeader('x-signature', signatureResponse);
+        response.setHeader('x-hash', hash);
         return data;
       }),
     );

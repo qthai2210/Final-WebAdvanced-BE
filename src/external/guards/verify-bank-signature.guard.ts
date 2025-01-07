@@ -46,6 +46,8 @@ export class VerifyBankSignatureGuard implements CanActivate {
         signature,
         bank.publicKey,
       );
+      console.log('publicKey:', bank.publicKey);
+      console.log('Signature verification result:', isValid);
 
       if (!isValid) {
         throw new UnauthorizedException('Invalid signature');

@@ -387,6 +387,8 @@ export class TransactionService {
         partnerBank.publicKey,
       );
 
+      console.log('Signature verification:', isValidSignature);
+
       if (!isValidSignature) {
         throw new HttpException(
           'Invalid response signature',
