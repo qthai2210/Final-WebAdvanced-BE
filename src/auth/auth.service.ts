@@ -311,7 +311,7 @@ export class AuthService {
       user.password,
     );
     if (!isCurrentPasswordValid) {
-      throw new UnauthorizedException('Current password is incorrect');
+      throw new BadRequestException('Current password is incorrect');
     }
 
     // Verify new password matches confirmation
