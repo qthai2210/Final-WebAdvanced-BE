@@ -297,7 +297,7 @@ export class AuthService {
   async changePassword(
     accessToken: string,
     changePasswordDto: ChangePasswordDto,
-  ): Promise<boolean> {
+  ): Promise<{ message: string }> {
     const payload = this.jwtService.verify(accessToken);
     console.log('Payload:', payload);
     const user = await this.userModel.findById(payload.sub).exec();
@@ -326,7 +326,7 @@ export class AuthService {
     user.password = hashedPassword;
     await user.save();
 
-    return true;
+    return { message: 'Password changed successfully' };
   }
 
   async forgotPassword(email: string): Promise<{ message: string }> {
