@@ -93,14 +93,30 @@ export class TransactionService {
       .aggregate([
         { $match: matchQuery },
         { $sort: { createdAt: -1 } },
-        { $skip: (pageNum - 1) * limitNum }, // Sử dụng giá trị đã convert
-        { $limit: limitNum }, // Sử dụng giá trị đã convert
+        { $skip: (pageNum - 1) * limitNum },
+        { $limit: limitNum },
         {
           $lookup: {
             from: 'banks',
             localField: 'bankId',
             foreignField: '_id',
-            as: 'bank',
+            as: 'mainBank',
+          },
+        },
+        {
+          $lookup: {
+            from: 'banks',
+            localField: 'fromBankId',
+            foreignField: '_id',
+            as: 'fromBank',
+          },
+        },
+        {
+          $lookup: {
+            from: 'banks',
+            localField: 'toBankId',
+            foreignField: '_id',
+            as: 'toBank',
           },
         },
         {
@@ -116,7 +132,19 @@ export class TransactionService {
             createdAt: 1,
             updatedAt: 1,
             bankId: 1,
-            'bank.name': 1,
+            bankName: {
+              $cond: {
+                if: { $eq: ['$type', 'INTERNAL'] },
+                then: { $arrayElemAt: ['$mainBank.name', 0] },
+                else: {
+                  $cond: {
+                    if: { $eq: ['$toAccount', accountNumber] },
+                    then: { $arrayElemAt: ['$fromBank.name', 0] },
+                    else: { $arrayElemAt: ['$toBank.name', 0] },
+                  },
+                },
+              },
+            },
             direction: {
               $cond: {
                 if: { $eq: ['$toAccount', accountNumber] },

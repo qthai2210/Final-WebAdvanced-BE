@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Bank } from 'src/models/banks/schemas/bank.schema';
 
 export class TransactionHistoryQueryDto {
   @ApiProperty({
@@ -122,5 +123,7 @@ export class TransactionHistoryResponseDto {
     required: false,
     example: '507f1f77bcf86cd799439011',
   })
-  bankId?: string;
+  bankId?: Bank;
+  fromBankId?: Bank;
+  toBankId?: Bank;
 }
