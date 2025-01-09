@@ -433,66 +433,80 @@ export class AuthService {
     registerDto: RegisterWithoutPasswordDto,
   ): Promise<boolean> {
     try {
+      // First check for existing user
       const existingUser = await this.userModel
         .findOne({
           $or: [
-            { username: registerDto.username },
             { email: registerDto.email },
+            { username: registerDto.username },
             { phone: registerDto.phone },
           ],
         })
-        .exec();
+        .lean();
 
+      // Specific error messages for each duplicate case
       if (existingUser) {
-        throw new ConflictException(
-          'Username, email or phone number already exists',
-        );
+        if (existingUser.email === registerDto.email) {
+          throw new ConflictException('Email already registered');
+        }
+        if (existingUser.username === registerDto.username) {
+          throw new ConflictException('Username already taken');
+        }
+        if (existingUser.phone === registerDto.phone) {
+          throw new ConflictException('Phone number already registered');
+        }
+        throw new ConflictException('User already exists');
       }
 
       const tempPassword = '123456';
       const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
-      // Create user document using plain object
-      const newUser = await this.userModel.create({
+      // Create new user with unique check
+      const newUser = new this.userModel({
         ...registerDto,
         password: hashedPassword,
         status: UserStatus.PENDING,
         failedLoginAttempts: 0,
-        isLocked: () => true,
       });
 
-      // Generate 6-digit OTP
+      // Generate OTP
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
       console.log('Generated OTP:', otp);
       const otpExpiry = new Date();
-      otpExpiry.setMinutes(otpExpiry.getMinutes() + 15); // OTP valid for 15 minutes
+      otpExpiry.setMinutes(otpExpiry.getMinutes() + 15);
 
-      // Save OTP and expiry to user
       newUser.resetPasswordOTP = otp;
       newUser.resetPasswordOTPExpires = otpExpiry;
+
+      // Generate auth data before saving
       const authData = this.generateToken(newUser);
       newUser.refreshToken = authData.refresh_token;
-      await newUser.save();
 
+      // Save with error handling
+      try {
+        await newUser.save();
+      } catch (saveError) {
+        if (saveError.code === 11000) {
+          // Handle duplicate key error
+          const field = Object.keys(saveError.keyPattern)[0];
+          throw new ConflictException(`${field} already exists`);
+        }
+        throw saveError;
+      }
+
+      // Send OTP email
       const isOtpSent = await this.mailService.sendOtpToVerifyUserAccount(
         newUser.email,
         otp,
       );
 
-      if (isOtpSent) return true;
-      else return false;
+      return isOtpSent;
     } catch (error) {
-      console.error('Registration error details:', {
-        error: error.message,
-        stack: error.stack,
-        name: error.name,
-        fullError: error,
-      });
-
-      if (error.name === 'MongooseError') {
-        throw new BadRequestException(`Database error: ${error.message}`);
+      if (error instanceof ConflictException) {
+        throw error;
       }
-      throw error;
+      console.error('Registration error:', error);
+      throw new BadRequestException(error.message);
     }
   }
 
@@ -537,13 +551,49 @@ export class AuthService {
   }
 
   async createEmployee(employeeData: any): Promise<UserDocument> {
-    const hashedPassword = await bcrypt.hash(employeeData.password, 10);
-    const employee = await this.userModel.create({
-      ...employeeData,
-      password: hashedPassword,
-      role: UserRole.EMPLOYEE,
-    });
-    return employee;
+    // Check for existing user with same email
+    const existingUser = await this.userModel
+      .findOne({
+        $or: [
+          { email: employeeData.email },
+          { username: employeeData.username },
+          { phone: employeeData.phone },
+        ],
+      })
+      .lean();
+
+    // Throw specific error messages based on what field is duplicate
+    if (existingUser) {
+      if (existingUser.email === employeeData.email) {
+        throw new ConflictException('Email already registered');
+      }
+      if (existingUser.username === employeeData.username) {
+        throw new ConflictException('Username already taken');
+      }
+      if (existingUser.phone === employeeData.phone) {
+        throw new ConflictException('Phone number already registered');
+      }
+      throw new ConflictException('User already exists');
+    }
+
+    try {
+      const hashedPassword = await bcrypt.hash(employeeData.password, 10);
+      const employee = await this.userModel.create({
+        ...employeeData,
+        password: hashedPassword,
+        role: UserRole.EMPLOYEE,
+        status: UserStatus.ACTIVE,
+        failedLoginAttempts: 0,
+      });
+      return employee;
+    } catch (error) {
+      if (error.code === 11000) {
+        // Extract the duplicate key field if possible
+        const field = Object.keys(error.keyPattern)[0];
+        throw new ConflictException(`${field} already exists`);
+      }
+      throw error;
+    }
   }
 
   async findAllEmployees(
@@ -599,7 +649,7 @@ export class AuthService {
     if (!employees.length && page > 1 && total > 0) {
       throw new NotFoundException(`No employees found on page ${page}`);
     }
-
+    console.log('Employees123:', employees);
     return {
       data: employees,
       metadata: {
