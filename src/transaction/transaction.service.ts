@@ -121,7 +121,6 @@ export class TransactionService {
         },
         {
           $project: {
-            id: '$_id',
             type: 1,
             amount: 1,
             fromAccount: 1,
@@ -131,16 +130,15 @@ export class TransactionService {
             status: 1,
             createdAt: 1,
             updatedAt: 1,
-            bankId: 1,
             bankName: {
               $cond: {
-                if: { $eq: ['$type', 'INTERNAL'] },
-                then: { $arrayElemAt: ['$mainBank.name', 0] },
+                if: { $eq: ['$type', 'external_receive'] },
+                then: { $arrayElemAt: ['$fromBank.name', 0] },
                 else: {
                   $cond: {
-                    if: { $eq: ['$toAccount', accountNumber] },
-                    then: { $arrayElemAt: ['$fromBank.name', 0] },
-                    else: { $arrayElemAt: ['$toBank.name', 0] },
+                    if: { $eq: ['$type', 'external_transfer'] },
+                    then: { $arrayElemAt: ['$toBank.name', 0] },
+                    else: { $arrayElemAt: ['$mainBank.name', 0] },
                   },
                 },
               },
