@@ -555,14 +555,14 @@ export class TransactionService {
       }
 
       // Create hash data in correct format
-      const dataToHash = {
-        accountNumber,
-        //  timestamp,
-      };
+      // const dataToHash = {
+      //accountNumber,
+      //  timestamp,
+      //};
 
       // Generate hash
       const hash = this.cryptoUtil.generateAPIHash(
-        dataToHash,
+        {},
         timestamp,
         partnerBank.secretKey,
       );
