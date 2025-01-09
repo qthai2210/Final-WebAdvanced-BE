@@ -157,4 +157,35 @@ export class ExternalService {
       );
     }
   }
+
+  async getCurrentBank() {
+    const bank = {
+      code: this.configService.get('BANK_CODE'),
+      name: this.configService.get('BANK_NAME'),
+      apiUrl: this.configService.get('BANK_API_URL'),
+      secretKey: this.configService.get('BANK_SECRET_KEY'),
+      publicKey: this.configService.get('BANK_PUBLIC_KEY'),
+      privateKey: this.configService.get('BANK_PRIVATE_KEY'),
+    };
+
+    return {
+      success: true,
+      data: bank,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  async getAllBanks() {
+    const banks = await this.bankModel
+      .find()
+      .select('name code apiUrl') // Only select necessary fields, excluding sensitive data
+      .lean()
+      .exec();
+
+    return {
+      success: true,
+      data: banks,
+      timestamp: new Date().toISOString(),
+    };
+  }
 }

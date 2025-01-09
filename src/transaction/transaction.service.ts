@@ -666,18 +666,29 @@ export class TransactionService {
   async getReconciliationReport(
     query: ReconciliationQueryDto,
   ): Promise<ReconciliationResponseDto> {
-    console.log('Query', query);
     try {
+      const page = Number(query.page) || 1;
+      const limit = Number(query.limit) || 10;
+      const skip = (page - 1) * limit;
+
       const matchQuery: any = {
-        createdAt: {
-          $gte: new Date(query.fromDate),
-          $lte: new Date(query.toDate),
-        },
         status: 'completed',
         $or: [{ type: 'external_transfer' }, { type: 'external_receive' }],
       };
 
-      // Convert bankId từ string sang ObjectId nếu có
+      // Add date filters if provided
+      if (query.fromDate && query.toDate) {
+        const fromDate = new Date(query.fromDate);
+        const toDate = new Date(query.toDate);
+        if (!isNaN(fromDate.getTime()) && !isNaN(toDate.getTime())) {
+          matchQuery.createdAt = {
+            $gte: fromDate,
+            $lte: toDate,
+          };
+        }
+      }
+
+      // Add bank filter if provided
       if (query.bankId) {
         const bankObjectId = new Types.ObjectId(query.bankId);
         matchQuery.$or = [
@@ -687,82 +698,36 @@ export class TransactionService {
         ];
       }
 
-      const transactions = await this.transactionModel
-        .aggregate([
-          { $match: matchQuery },
-          {
-            $lookup: {
-              from: 'banks',
-              localField: 'bankId',
-              foreignField: '_id',
-              as: 'bank',
-            },
-          },
-          {
-            $group: {
-              _id: {
-                bankId: { $ifNull: ['$bankId', '$fromBankId'] },
-              },
-              sent: {
-                $sum: {
-                  $cond: [
-                    { $eq: ['$type', 'external_transfer'] },
-                    '$amount',
-                    0,
-                  ],
-                },
-              },
-              received: {
-                $sum: {
-                  $cond: [{ $eq: ['$type', 'external_receive'] }, '$amount', 0],
-                },
-              },
-              count: { $sum: 1 },
-              transactions: { $push: '$$ROOT' },
-            },
-          },
-        ])
-        .exec();
-
-      const banksData = await Promise.all(
-        transactions.map(async (group) => {
-          const bank = await this.bankModel.findById(group._id.bankId);
-          return {
-            bankName: bank?.name || 'Unknown Bank',
-            bankId: group._id.bankId,
-            totalReceived: group.received,
-            totalSent: group.sent,
-            transactionCount: group.count,
-            transactions: group.transactions.map((t) => ({
-              id: t._id,
-              type: t.type === 'external_transfer' ? 'sent' : 'received',
-              amount: t.amount,
-              fromAccount: t.fromAccount,
-              toAccount: t.toAccount,
-              content: t.content,
-              createdAt: t.createdAt,
-              status: t.status,
-            })),
-          };
-        }),
-      );
+      const [transactions, total] = await Promise.all([
+        this.transactionModel
+          .find(matchQuery)
+          .populate('bankId')
+          .populate('fromBankId')
+          .populate('toBankId')
+          .skip(skip)
+          .limit(limit)
+          .exec(),
+        this.transactionModel.countDocuments(matchQuery),
+      ]);
 
       return {
-        totalAmount: banksData.reduce(
-          (sum, bank) => sum + bank.totalReceived + bank.totalSent,
-          0,
-        ),
-        totalTransactions: banksData.reduce(
-          (sum, bank) => sum + bank.transactionCount,
-          0,
-        ),
-        banks: banksData,
+        success: true,
+        data: {
+          data: transactions,
+          metadata: {
+            total,
+            page: page.toString(),
+            lastPage: Math.ceil(total / limit),
+            limit: limit.toString(),
+          },
+        },
+        timestamp: new Date().toISOString(),
       };
     } catch (error) {
       console.error('Reconciliation error:', error);
-      if (error.name === 'BSONTypeError') {
+      if (error.name === 'BSONTypeError' || error.name === 'CastError') {
         throw new HttpException(
-          'Invalid bank ID format',
+          'Invalid date format or bank ID',
           HttpStatus.BAD_REQUEST,
         );
       }

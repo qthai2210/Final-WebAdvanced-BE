@@ -68,4 +68,40 @@ export class ExternalController {
   async getAccountInfo(@Query('accountNumber') accountNumber: string) {
     return this.externalService.getInfo(accountNumber);
   }
+
+  @Get('bank-info')
+  @ApiOperation({ summary: 'Get current bank information' })
+  @ApiResponse({ status: 200, description: 'Returns current bank information' })
+  async getCurrentBank() {
+    return this.externalService.getCurrentBank();
+  }
+
+  @Get('banks')
+  @ApiOperation({ summary: 'Get all partner banks' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns list of all banks',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        data: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              _id: { type: 'string' },
+              name: { type: 'string' },
+              code: { type: 'string' },
+              apiUrl: { type: 'string' },
+            },
+          },
+        },
+        timestamp: { type: 'string' },
+      },
+    },
+  })
+  async getAllBanks() {
+    return this.externalService.getAllBanks();
+  }
 }
