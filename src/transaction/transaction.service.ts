@@ -383,7 +383,7 @@ export class TransactionService {
       console.log('Request payload:', requestPayload);
 
       const response = await axios.post(
-        `${partnerBank.apiUrl}/external/receive-transfer`, // Sửa URL từ configService
+        `${partnerBank.apiUrl}/external/accounts/${transaction.toAccount}/deposit`, // Sửa URL từ configService
         requestPayload, // Gửi payload dưới dạng object
         {
           headers: {
@@ -404,7 +404,9 @@ export class TransactionService {
       const responseSignature = response.headers['x-signature'];
 
       // Recreate hash string that was signed
-      const hashString = `${timestamp}${signature}${hash}`;
+      const hashString = response.headers['x-hash'];
+      console.log(responseSignature, partnerBank.publicKey);
+      console.log('Hash string:', hashString);
 
       // Verify the response signature
       const isValidSignature = this.cryptoUtil.verifySignature(
@@ -578,9 +580,9 @@ export class TransactionService {
       });
 
       const response = await axios.get(
-        `${partnerBank.apiUrl}/external/account-info`,
+        `${partnerBank.apiUrl}/external/accounts/${accountNumber}`,
         {
-          params: { accountNumber },
+          //params: { accountNumber },
           headers: {
             'x-bank-code': this.configService.get('BANK_CODE'),
             'x-timestamp': timestamp,
