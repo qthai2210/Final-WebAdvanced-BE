@@ -46,13 +46,38 @@ export class TransactionRecordDto {
   status: string;
 }
 
+export class ReconciliationMetadata {
+  @ApiProperty()
+  total: number;
+
+  @ApiProperty()
+  page: string;
+
+  @ApiProperty()
+  lastPage: number;
+
+  @ApiProperty()
+  limit: string;
+}
+
+export class ReconciliationData {
+  @ApiProperty({ isArray: true })
+  data: any[];
+
+  @ApiProperty()
+  metadata: ReconciliationMetadata;
+}
+
 export class ReconciliationResponseDto {
   @ApiProperty()
-  totalAmount: number;
+  success: boolean;
 
   @ApiProperty()
-  totalTransactions: number;
+  data: ReconciliationData;
 
-  @ApiProperty({ type: [BankReconciliationDto] })
-  banks: BankReconciliationDto[];
+  @ApiProperty()
+  timestamp: string;
+
+  @ApiProperty()
+  message?: string;
 }

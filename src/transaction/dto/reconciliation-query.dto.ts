@@ -1,17 +1,20 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsOptional, IsDateString, IsString } from 'class-validator';
+import { PaginationDto } from 'src/auth/dto/pagination.dto';
 
-export class ReconciliationQueryDto {
-  @ApiProperty({ required: true })
+export class ReconciliationQueryDto extends PaginationDto {
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsDateString()
-  fromDate: string;
+  fromDate?: string;
 
-  @ApiProperty({ required: true })
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsDateString()
-  toDate: string;
+  toDate?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
-  bankId?: string; // Specific bank or all banks if not provided
+  bankId?: string;
 }
