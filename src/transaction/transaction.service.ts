@@ -93,19 +93,34 @@ export class TransactionService {
       .aggregate([
         { $match: matchQuery },
         { $sort: { createdAt: -1 } },
-        { $skip: (pageNum - 1) * limitNum }, // Sử dụng giá trị đã convert
-        { $limit: limitNum }, // Sử dụng giá trị đã convert
+        { $skip: (pageNum - 1) * limitNum },
+        { $limit: limitNum },
         {
           $lookup: {
             from: 'banks',
             localField: 'bankId',
             foreignField: '_id',
-            as: 'bank',
+            as: 'mainBank',
+          },
+        },
+        {
+          $lookup: {
+            from: 'banks',
+            localField: 'fromBankId',
+            foreignField: '_id',
+            as: 'fromBank',
+          },
+        },
+        {
+          $lookup: {
+            from: 'banks',
+            localField: 'toBankId',
+            foreignField: '_id',
+            as: 'toBank',
           },
         },
         {
           $project: {
-            id: '$_id',
             type: 1,
             amount: 1,
             fromAccount: 1,
@@ -115,8 +130,19 @@ export class TransactionService {
             status: 1,
             createdAt: 1,
             updatedAt: 1,
-            bankId: 1,
-            'bank.name': 1,
+            bankName: {
+              $cond: {
+                if: { $eq: ['$type', 'external_receive'] },
+                then: { $arrayElemAt: ['$fromBank.name', 0] },
+                else: {
+                  $cond: {
+                    if: { $eq: ['$type', 'external_transfer'] },
+                    then: { $arrayElemAt: ['$toBank.name', 0] },
+                    else: { $arrayElemAt: ['$mainBank.name', 0] },
+                  },
+                },
+              },
+            },
             direction: {
               $cond: {
                 if: { $eq: ['$toAccount', accountNumber] },
